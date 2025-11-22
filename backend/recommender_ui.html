@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Social Space Prototype</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #0056b3; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 4px; font-size: 16px; }
+        button:hover { background-color: #004494; }
+        
+        .card { border: 1px solid #ddd; padding: 15px; margin-top: 15px; border-radius: 8px; background: #f9f9f9; }
+        .tag { display: inline-block; background: #e1ecf4; color: #39739d; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-bottom: 5px; }
+        .score { float: right; color: green; font-weight: bold; }
+        .contact { color: #666; font-size: 0.9em; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>Find Spaces For You!</h1>
+    <p>Start by filling out some information about yourself below:</p>
+
+    <div class="input-group">
+        <label>Year Standing</label>
+        <select id="year">
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+            <option value="Grad Student">Grad Student</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Classes (Comma separated)</label>
+        <input type="text" id="classes" placeholder="COSC 101, MATH 200, ENG 112" value="COSC 101">
+    </div>
+
+    <div class="input-group">
+        <label>Interests & Hobbies</label>
+        <textarea id="interests" rows="3" placeholder="I like hiking, chess, and video games...">I like coding and hackathons</textarea>
+    </div>
+
+    <button onclick="getRecommendations()">Generate Spaces</button>
+
+    <div id="results"></div>
+
+    <script>
+        async function getRecommendations() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Thinking...</p>';
+
+            const payload = {
+                year: document.getElementById('year').value,
+                classes: document.getElementById('classes').value.split(','),
+                interests: document.getElementById('interests').value
+            };
+
+            try {
+                // TALK TO ThE PYTHON SERVER
+                const response = await fetch('http://127.0.0.1:5000/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                resultsDiv.innerHTML = ''; // Clear loading text
+
+                if (data.length === 0) {
+                    resultsDiv.innerHTML = '<p>No matches found. Try adding more keywords!</p>';
+                    return;
+                }
+
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `
+                        <span class="score">${Math.round(item.match_score * 100)}% Match</span>
+                        <span class="tag">${item.category}</span>
+                        <h3>${item.name}</h3>
+                        <p>${item.description}</p>
+                        ${item.contact ? `<div class="contact"> ${item.contact}</div>` : ''}
+                    `;
+                    resultsDiv.appendChild(div);
+                });
+
+            } catch (err) {
+                console.error(err);
+                resultsDiv.innerHTML = '<p style="color:red">Error: Could not connect to Python backend. Is it running?</p>';
+            }
+        }
+    </script>
+</body>
+</html>
