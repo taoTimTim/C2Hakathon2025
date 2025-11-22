@@ -2,3 +2,8 @@ mysql-connector-python
 python-dotenv
 fastapi
 uvicorn
+
+echo "flask
+flask-cors
+pandas
+scikit-learn" 
