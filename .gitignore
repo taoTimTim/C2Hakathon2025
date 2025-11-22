@@ -5,5 +5,5 @@ __pycache__/
 *.pyd
 
 .env
-database/ca.pem
 venv/
+*ca.pem
