@@ -27,10 +27,12 @@ def init_schema():
     with open(SCHEMA_PATH, "r") as f:
         sql = f.read()
 
-    for statement in sql.split(";"):
-        table = statement.strip()
-        if table:
-            cur.execute(table + ";")
+    statements = sql.split(";")
+
+    for statement in statements:
+        stmt = statement.strip()
+        if stmt:
+            cur.execute(stmt + ";")
 
     conn.commit()
     cur.close()

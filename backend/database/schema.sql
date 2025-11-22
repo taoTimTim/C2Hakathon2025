@@ -1,16 +1,15 @@
-/* Users */
 CREATE TABLE IF NOT EXISTS users (
     canvas_user_id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255),
     role ENUM('student', 'teacher', 'staff', 'admin') DEFAULT 'student'
 );
 
-/* Classes */
 CREATE TABLE IF NOT EXISTS classes (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 CREATE TABLE IF NOT EXISTS class_members (
     class_id VARCHAR(255) NOT NULL,
     user_id VARCHAR(255) NOT NULL,
@@ -19,7 +18,6 @@ CREATE TABLE IF NOT EXISTS class_members (
     FOREIGN KEY (user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
 );
 
-/* Clubs */
 CREATE TABLE IF NOT EXISTS clubs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -28,16 +26,16 @@ CREATE TABLE IF NOT EXISTS clubs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(canvas_user_id)
 );
+
 CREATE TABLE IF NOT EXISTS club_members (
     club_id INT NOT NULL,
     user_id VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'member', /* leader, member */
+    role VARCHAR(50) DEFAULT 'member',
     PRIMARY KEY (club_id, user_id),
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
 );
 
-/* Rooms */
 CREATE TABLE IF NOT EXISTS rooms (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -57,7 +55,6 @@ CREATE TABLE IF NOT EXISTS room_members (
     FOREIGN KEY (user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
 );
 
-/* Messaging */
 CREATE TABLE IF NOT EXISTS messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     room_id INT NOT NULL,
@@ -70,11 +67,9 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
 );
 
-
-/* Posts */
 CREATE TABLE IF NOT EXISTS posts (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    scope VARCHAR(50), /* school, class, club */
+    scope VARCHAR(50),
     scope_id VARCHAR(255),
     author VARCHAR(255),
     title VARCHAR(50),
