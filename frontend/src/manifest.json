@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+  "name": "Zebra for Canvas",
+  "version": "1.0",
+  "content_security_policy": "script-src 'self'",
+
+  "description": "Connect with events, clubs, and classmates on campus.",
+
+  "icons": {
+    "48": "icons/slide_library_38.png"
+  },
+
+  "web_accessible_resources": [
+    "icons/newsmode.svg",
+    "pages/zebra.html"
+  ],
+
+  "permissions": ["activeTab"],
+
+  "browser_action": {
+    "default_icon": "icons/slide_library_38.png",
+    "default_title": "Zebra for Canvas",
+    "default_popup": "popup/popup.html"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://canvas.ubc.ca/*"],
+      "js": ["zebra.js"]
+    }
+  ]
+}
