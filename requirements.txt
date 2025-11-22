@@ -8,3 +8,9 @@ requests
 eventlet
 fastapi
 uvicorn
+pydantic
+
+echo "flask
+flask-cors
+pandas
+scikit-learn" 
