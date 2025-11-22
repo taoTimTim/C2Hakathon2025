@@ -42,6 +42,7 @@ def manual_sync():
 
         return jsonify({
             "message": "Sync completed successfully",
+            "synced_courses": result.get('synced_courses', 0),
             "synced_groups": result.get('synced_groups', 0),
             "synced_members": result.get('synced_members', 0)
         }), 200

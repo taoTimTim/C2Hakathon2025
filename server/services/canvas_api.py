@@ -52,6 +52,10 @@ class CanvasAPI:
         """Get all courses for the current user"""
         return self._make_request('courses')
 
+    def get_course_users(self, course_id):
+        """Get all users enrolled in a specific course"""
+        return self._make_request(f'courses/{course_id}/users')
+
     def get_course_groups(self, course_id):
         """Get all groups for a specific course"""
         return self._make_request(f'courses/{course_id}/groups')
@@ -66,18 +70,41 @@ class CanvasAPI:
 
     def sync_user_groups(self, user_id):
         """
-        Sync Canvas groups to chat rooms
-        Creates rooms from user's Canvas groups and adds members
-        Returns: {synced_groups: int, synced_members: int}
+        Sync Canvas courses and groups to chat rooms
+        Creates rooms from user's Canvas courses (class-wide) and groups
+        Returns: {synced_courses: int, synced_groups: int, synced_members: int}
         """
         try:
-            # Get user's Canvas groups
-            groups = self.get_user_groups()
-
             room_service = RoomService()
+            synced_courses = 0
             synced_groups = 0
             synced_members = 0
 
+            # Sync Courses (class-wide chats)
+            courses = self.get_user_courses()
+            for course in courses:
+                course_id = course['id']
+                course_name = course.get('name', f'Course {course_id}')
+
+                # Create or get room (using Canvas course ID as room ID)
+                room = room_service.get_room_by_id(course_id)
+
+                if not room:
+                    # Create new room (system-generated)
+                    room_service.create_room(course_name, created_by=None)
+                    synced_courses += 1
+
+                # Get course users from Canvas
+                course_users = self.get_course_users(course_id)
+
+                # Add users to room
+                for course_user in course_users:
+                    user_id_member = course_user['id']
+                    room_service.add_user_to_room(user_id_member, course_id)
+                    synced_members += 1
+
+            # Sync Groups (group chats)
+            groups = self.get_user_groups()
             for group in groups:
                 group_id = group['id']
                 group_name = group['name']
@@ -100,10 +127,11 @@ class CanvasAPI:
                     synced_members += 1
 
             return {
+                'synced_courses': synced_courses,
                 'synced_groups': synced_groups,
                 'synced_members': synced_members
             }
 
         except Exception as e:
-            print(f"Group sync failed: {str(e)}")
+            print(f"Sync failed: {str(e)}")
             raise
