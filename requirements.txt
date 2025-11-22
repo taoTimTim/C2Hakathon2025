@@ -1,5 +1,11 @@
 mysql-connector-python
 python-dotenv
+Flask
+Flask-SocketIO
+flask-cors
+python-socketio
+requests
+eventlet
 fastapi
 uvicorn
 pydantic
