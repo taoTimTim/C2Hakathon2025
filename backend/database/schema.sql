@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS club_members (
 CREATE TABLE IF NOT EXISTS rooms (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    scope_id VARCHAR(50),
     room_type VARCHAR(50),
     is_system_generated BOOLEAN NOT NULL DEFAULT FALSE,
     created_by VARCHAR(255),
@@ -79,3 +80,9 @@ CREATE TABLE IF NOT EXISTS posts (
     FOREIGN KEY (author) REFERENCES users(canvas_user_id)
 );
 
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id VARCHAR(255) PRIMARY KEY,
+    canvas_user_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (canvas_user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
+);
