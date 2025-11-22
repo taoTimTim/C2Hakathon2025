@@ -1,0 +1,45 @@
+CREATE TABLE IF NOT EXISTS users (
+    id int AUTO_INCREMENT PRIMARY KEY,
+    canvas_user_id VARCHAR(255),
+    name VARCHAR(255),
+    role VARCHAR(255) DEFAULT 'student',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS campus_posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255),
+    body TEXT NOT NULL,
+    image_url VARCHAR(255),
+    posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS clubs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS club_members (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    club_id INT NOT NULL,
+    user_id INT NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (club_id) REFERENCES clubs(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS club_posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    club_id INT NOT NULL,
+    user_id INT NOT NULL,
+    title VARCHAR(255),
+    body TEXT NOT NULL,
+    image_url VARCHAR(255),
+    posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (club_id) REFERENCES clubs(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
