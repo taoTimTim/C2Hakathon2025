@@ -11,14 +11,24 @@
     "http://localhost:5000/*"
   ],
   "background": {
-    "scripts": ["background.js"],
+    "scripts": [
+      "background.js"
+    ],
     "persistent": false
   },
   "content_scripts": [
     {
-      "matches": ["https://canvas.ubc.ca/*"],
-      "js": ["chat-client.js", "chat-ui.js", "content.js"],
-      "css": ["styles.css"],
+      "matches": [
+        "https://canvas.ubc.ca/*"
+      ],
+      "js": [
+        "chat-client.js",
+        "chat-ui.js",
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -31,4 +41,3 @@
     }
   }
 }
-

@@ -33,31 +33,50 @@ def get_rooms():
     response, status_code = proxy.forward_request('/rooms', method='GET', query_params={'user_id': user_id})
     return jsonify(response), status_code
 
-@bp.route('/rooms/<int:room_id>/messages', methods=['GET'])
-def get_room_messages(room_id):
+@bp.route('/rooms/<int:room_id>/messages', methods=['GET', 'POST'])
+def room_messages(room_id):
     """
-    Proxy to FastAPI: Get message history for a specific room
+    Proxy to FastAPI: Get or send messages in a room
     Requires: Authorization header
-    Query params: limit (default 50), offset (default 0)
+    GET - Query params: limit (default 50), offset (default 0)
+    POST - Body: {"content": "message text"}
     """
     user_id = get_authenticated_user()
 
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    # Forward query params
-    query_params = {
-        'limit': request.args.get('limit', 50, type=int),
-        'offset': request.args.get('offset', 0, type=int)
-    }
+    if request.method == 'GET':
+        # Forward query params
+        query_params = {
+            'limit': request.args.get('limit', 50, type=int),
+            'offset': request.args.get('offset', 0, type=int)
+        }
 
-    # Forward to FastAPI
-    response, status_code = proxy.forward_request(
-        f'/rooms/{room_id}/messages',
-        method='GET',
-        query_params=query_params
-    )
-    return jsonify(response), status_code
+        # Forward to FastAPI
+        response, status_code = proxy.forward_request(
+            f'/rooms/{room_id}/messages',
+            method='GET',
+            query_params=query_params
+        )
+        return jsonify(response), status_code
+
+    elif request.method == 'POST':
+        # Send new message
+        data = request.get_json()
+        if not data or 'content' not in data:
+            return jsonify({"error": "Missing content field"}), 400
+
+        # Forward to FastAPI with user_id
+        response, status_code = proxy.forward_request(
+            f'/rooms/{room_id}/messages',
+            method='POST',
+            json_data={
+                'user_id': user_id,
+                'content': data['content']
+            }
+        )
+        return jsonify(response), status_code
 
 @bp.route('/users/me', methods=['GET'])
 def get_current_user():

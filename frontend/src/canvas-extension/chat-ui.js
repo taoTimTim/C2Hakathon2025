@@ -2,7 +2,7 @@
 // Creates and manages the chat interface
 // Note: API_BASE is defined in content.js
 
-const CHAT_SOCKET_URL = 'http://localhost:5000';
+const CHAT_SERVER_URL = 'http://localhost:5000';
 
 // Get session token from localStorage
 function getSessionToken() {
@@ -16,7 +16,7 @@ let typingTimeout = null;
 // Initialize chat client
 async function initializeChatClient() {
     if (!chatClient) {
-        chatClient = new ChatClient(CHAT_SOCKET_URL, getSessionToken());
+        chatClient = new ChatClient(CHAT_SERVER_URL, getSessionToken());
 
         try {
             await chatClient.connect();
@@ -106,7 +106,7 @@ function showChatModal(roomId, roomName, roomType) {
                         <h3>${roomName}</h3>
                         <span class="chat-room-type">${roomType.toUpperCase()}</span>
                     </div>
-                    <button class="chat-close-btn" onclick="closeChat()">&times;</button>
+                    <button class="chat-close-btn" id="chat-close-btn">&times;</button>
                 </div>
 
                 <div class="chat-messages" id="chat-messages">
@@ -122,10 +122,8 @@ function showChatModal(roomId, roomName, roomType) {
                         type="text"
                         id="chat-input"
                         placeholder="Type a message..."
-                        onkeypress="handleChatKeyPress(event)"
-                        oninput="handleTyping()"
                     />
-                    <button onclick="sendChatMessage()" class="chat-send-btn">Send</button>
+                    <button id="chat-send-btn" class="chat-send-btn">Send</button>
                 </div>
             </div>
         </div>
@@ -133,27 +131,41 @@ function showChatModal(roomId, roomName, roomType) {
 
     document.body.appendChild(modal);
 
+    // Setup event listeners for chat controls
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send-btn');
+    const closeBtn = document.getElementById('chat-close-btn');
+
+    if (chatInput) {
+        chatInput.addEventListener('keypress', handleChatKeyPress);
+        chatInput.addEventListener('input', handleTyping);
+    }
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendChatMessage);
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeChat);
+    }
+
     // Focus input
     setTimeout(() => {
-        document.getElementById('chat-input').focus();
+        if (chatInput) chatInput.focus();
     }, 100);
 }
 
 // Load message history
 async function loadMessageHistory(roomId) {
     try {
-        const response = await fetch(`${API_BASE}/messages?room_id=${roomId}`, {
+        // Use safeFetch from content.js with Bearer token
+        const messages = await window.safeFetch(`${window.API_BASE}/rooms/${roomId}/messages`, {
+            method: 'GET',
             headers: {
                 'Authorization': `Bearer ${getSessionToken()}`,
                 'Content-Type': 'application/json'
             }
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const messages = await response.json();
         console.log('Message history loaded:', messages);
 
         const messagesContainer = document.getElementById('chat-messages');
@@ -164,6 +176,12 @@ async function loadMessageHistory(roomId) {
         } else {
             messages.forEach(message => addMessageToUI(message));
             scrollToBottom();
+
+            // Set the last message ID for this room to avoid re-adding these messages during polling
+            if (chatClient && messages.length > 0) {
+                const latestMessage = messages[messages.length - 1];
+                chatClient.lastMessageIdByRoom[roomId] = latestMessage.id;
+            }
         }
 
     } catch (error) {
@@ -185,11 +203,35 @@ function addMessageToUI(message) {
     messageDiv.className = 'chat-message';
     messageDiv.dataset.messageId = message.id;
 
-    const timestamp = new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Format timestamp in PST with date
+    const messageDate = new Date(message.created_at);
+    const now = new Date();
+    const isToday = messageDate.toDateString() === now.toDateString();
+
+    let timestamp;
+    if (isToday) {
+        // Today: just show time
+        timestamp = messageDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: 'America/Los_Angeles'
+        });
+    } else {
+        // Other days: show date + time
+        timestamp = messageDate.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: 'America/Los_Angeles'
+        });
+    }
+
+    const userName = message.user_name || `User ${message.user_id}`;
 
     messageDiv.innerHTML = `
         <div class="message-header">
-            <span class="message-user">User ${message.user_id}</span>
+            <span class="message-user">${escapeHtml(userName)}</span>
             <span class="message-time">${timestamp}</span>
         </div>
         <div class="message-content">${escapeHtml(message.content)}</div>

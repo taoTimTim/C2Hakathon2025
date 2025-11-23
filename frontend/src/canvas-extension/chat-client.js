@@ -1,151 +1,178 @@
-// WebSocket Chat Client using Socket.IO
-// Connects to the Flask-SocketIO server
+// HTTP Polling Chat Client (CSP-safe, no WebSocket required)
+// Uses periodic polling to check for new messages
 
 class ChatClient {
     constructor(serverUrl, sessionToken) {
         this.serverUrl = serverUrl;
         this.sessionToken = sessionToken;
-        this.socket = null;
+        this.connected = false;
         this.currentRoomId = null;
         this.messageHandlers = [];
-        this.typingHandlers = [];
-        this.userJoinHandlers = [];
-        this.userLeaveHandlers = [];
+        this.pollingInterval = null;
+        this.lastMessageIdByRoom = {}; // Track last message ID per room
+        this.POLL_INTERVAL = 1000; // Poll every 1 second
     }
 
-    connect() {
-        return new Promise((resolve, reject) => {
-            // Load Socket.IO client from CDN
-            if (typeof io === 'undefined') {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
-                script.onload = () => this.initializeSocket(resolve, reject);
-                script.onerror = () => reject(new Error('Failed to load Socket.IO'));
-                document.head.appendChild(script);
-            } else {
-                this.initializeSocket(resolve, reject);
-            }
-        });
-    }
+    async connect() {
+        // Test connection by trying to get user info
+        try {
+            console.log('Testing connection to server...');
+            const response = await window.safeFetch(`${this.serverUrl}/api/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.sessionToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
 
-    initializeSocket(resolve, reject) {
-        console.log('Connecting to WebSocket server...');
-
-        this.socket = io(this.serverUrl, {
-            auth: {
-                token: this.sessionToken
-            },
-            transports: ['websocket', 'polling']
-        });
-
-        this.socket.on('connected', (data) => {
-            console.log('Connected to chat server:', data);
-            this.setupEventHandlers();
-            resolve(data);
-        });
-
-        this.socket.on('connect_error', (error) => {
-            console.error('Connection error:', error);
-            reject(error);
-        });
-
-        this.socket.on('error', (data) => {
-            console.error('Socket error:', data.message);
-        });
-    }
-
-    setupEventHandlers() {
-        // Handle incoming messages
-        this.socket.on('new_message', (message) => {
-            console.log('New message:', message);
-            this.messageHandlers.forEach(handler => handler(message));
-        });
-
-        // Handle message edits
-        this.socket.on('message_edited', (message) => {
-            console.log('Message edited:', message);
-            this.messageHandlers.forEach(handler => handler(message, true));
-        });
-
-        // Handle typing indicators
-        this.socket.on('typing_indicator', (data) => {
-            this.typingHandlers.forEach(handler => handler(data));
-        });
-
-        // Handle user joined
-        this.socket.on('user_joined', (data) => {
-            console.log('User joined:', data);
-            this.userJoinHandlers.forEach(handler => handler(data));
-        });
-
-        // Handle user left
-        this.socket.on('user_left', (data) => {
-            console.log('User left:', data);
-            this.userLeaveHandlers.forEach(handler => handler(data));
-        });
-
-        // Handle room joined
-        this.socket.on('room_joined', (data) => {
-            console.log('Joined room:', data);
-            this.currentRoomId = data.room_id;
-        });
-
-        // Handle room left
-        this.socket.on('room_left', (data) => {
-            console.log('Left room:', data);
-            if (this.currentRoomId === data.room_id) {
-                this.currentRoomId = null;
-            }
-        });
+            console.log('Connected to server:', response);
+            this.connected = true;
+            return { status: 'connected', user: response };
+        } catch (error) {
+            console.error('Connection failed:', error);
+            this.connected = false;
+            throw error;
+        }
     }
 
     joinRoom(roomId) {
-        if (!this.socket || !this.socket.connected) {
-            throw new Error('Not connected to server');
+        if (!this.connected) {
+            console.error('Cannot join room: Not connected');
+            return;
         }
 
-        this.socket.emit('join_room', { room_id: roomId });
+        console.log('Joining room:', roomId);
+
+        // Stop polling previous room if any
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+        }
+
+        this.currentRoomId = roomId;
+
+        // Initialize tracking for this room if not already done
+        if (!(roomId in this.lastMessageIdByRoom)) {
+            this.lastMessageIdByRoom[roomId] = null;
+        }
+
+        // Start polling for new messages
+        this.startPolling();
     }
 
     leaveRoom(roomId) {
-        if (!this.socket || !this.socket.connected) {
+        console.log('Leaving room:', roomId);
+
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+
+        if (this.currentRoomId === roomId) {
+            this.currentRoomId = null;
+        }
+    }
+
+    startPolling() {
+        // Initial poll
+        this.pollMessages();
+
+        // Poll every 1 second
+        this.pollingInterval = setInterval(() => {
+            this.pollMessages();
+        }, this.POLL_INTERVAL);
+    }
+
+    async pollMessages() {
+        if (!this.currentRoomId || !this.connected) {
             return;
         }
 
-        this.socket.emit('leave_room', { room_id: roomId });
+        try {
+            // Fetch recent messages
+            const messages = await window.safeFetch(
+                `${this.serverUrl}/api/rooms/${this.currentRoomId}/messages?limit=50`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${this.sessionToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (!Array.isArray(messages) || messages.length === 0) {
+                return;
+            }
+
+            // Sort messages by ID to ensure correct order
+            messages.sort((a, b) => a.id - b.id);
+
+            // Get the latest message ID
+            const latestMessageId = messages[messages.length - 1].id;
+
+            // Get the last message ID for this specific room
+            const lastSeenId = this.lastMessageIdByRoom[this.currentRoomId];
+
+            // If this is first poll for this room, just set the last message ID
+            if (lastSeenId === null) {
+                this.lastMessageIdByRoom[this.currentRoomId] = latestMessageId;
+                return;
+            }
+
+            // Check for new messages (sorted by ID)
+            const newMessages = messages.filter(msg => msg.id > lastSeenId);
+
+            if (newMessages.length > 0) {
+                // Notify handlers about new messages (already sorted)
+                newMessages.forEach(message => {
+                    this.messageHandlers.forEach(handler => handler(message, false));
+                });
+
+                // Update last message ID for this room
+                this.lastMessageIdByRoom[this.currentRoomId] = latestMessageId;
+            }
+
+        } catch (error) {
+            console.error('Error polling messages:', error);
+        }
     }
 
-    sendMessage(roomId, content) {
-        if (!this.socket || !this.socket.connected) {
-            throw new Error('Not connected to server');
+    async sendMessage(roomId, content) {
+        if (!this.connected) {
+            console.error('Cannot send message: Not connected');
+            return;
         }
 
-        this.socket.emit('send_message', {
-            room_id: roomId,
-            content: content
-        });
-    }
+        console.log('Sending message to room:', roomId);
 
-    editMessage(messageId, content) {
-        if (!this.socket || !this.socket.connected) {
-            throw new Error('Not connected to server');
+        try {
+            // Use background script to send message
+            const message = await window.safeFetch(
+                `${this.serverUrl}/api/rooms/${roomId}/messages`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.sessionToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content })
+                }
+            );
+
+            console.log('Message sent:', message);
+
+            // Immediately poll for the new message
+            setTimeout(() => this.pollMessages(), 100);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            throw error;
         }
-
-        this.socket.emit('edit_message', {
-            message_id: messageId,
-            content: content
-        });
     }
 
     sendTyping(roomId, isTyping) {
-        if (!this.socket || !this.socket.connected) {
-            return;
-        }
-
-        this.socket.emit('typing', {
-            room_id: roomId,
-            is_typing: isTyping
-        });
+        // Typing indicators not supported in polling mode
+        // Could implement by sending API requests, but skipping for simplicity
     }
 
     onMessage(handler) {
@@ -153,28 +180,27 @@ class ChatClient {
     }
 
     onTyping(handler) {
-        this.typingHandlers.push(handler);
+        // Not supported in polling mode
     }
 
     onUserJoin(handler) {
-        this.userJoinHandlers.push(handler);
+        // Not supported in polling mode
     }
 
     onUserLeave(handler) {
-        this.userLeaveHandlers.push(handler);
+        // Not supported in polling mode
     }
 
     disconnect() {
-        if (this.socket) {
-            this.socket.disconnect();
-            this.socket = null;
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
         }
-    }
-
-    isConnected() {
-        return this.socket && this.socket.connected;
+        this.connected = false;
+        this.currentRoomId = null;
+        // Keep lastMessageIdByRoom to maintain state across reconnects
     }
 }
 
-// Export for use in other files
+// Make ChatClient available globally
 window.ChatClient = ChatClient;

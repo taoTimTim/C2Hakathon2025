@@ -18,7 +18,21 @@ def get_messages(room_id: int):
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    sql = "SELECT * FROM messages WHERE room_id = %s ORDER BY created_at DESC"
+    sql = """
+        SELECT
+            m.id,
+            m.room_id,
+            m.user_id,
+            m.content,
+            m.created_at,
+            m.is_edited,
+            m.edited_at,
+            u.name as user_name
+        FROM messages m
+        LEFT JOIN users u ON m.user_id = u.canvas_user_id
+        WHERE m.room_id = %s
+        ORDER BY m.id ASC
+    """
     cur.execute(sql, (room_id,))
 
     messages = cur.fetchall()

@@ -1,45 +1,15 @@
-<div id="ubc-clubs-tray">
+<!-- Main Container: Fixed 100vh to ensure it never exceeds screen height -->
+<div id="ubc-clubs-tray" style="display: flex; flex-direction: column; height: 100vh; box-sizing: border-box;">
     
-    <!-- VIEW 0: Login (Shown First) -->
-    <div id="view-login" style="display: block; padding: 40px 30px;">
-        <h2 style="margin:0 0 10px 0; font-size: 1.6rem; color: #2D3B45; text-align: center;">Welcome to Social Spaces</h2>
-        <p style="text-align: center; color: #666; margin-bottom: 30px;">Enter your Canvas API token to get started</p>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="display:block; font-weight:bold; margin-bottom: 8px;">Canvas API Token:</label>
-            <input type="password" id="login-token" placeholder="Enter your Canvas API token" style="width:100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family:inherit;">
-        </div>
-
-        <button id="login-submit-btn" style="width:100%; background:#0374B5; color:white; padding:12px; border:none; border-radius:6px; cursor:pointer; font-weight: bold; font-size: 1rem;">
-            Login
-        </button>
-        
-        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; font-size: 0.9em; color: #555;">
-            <strong style="display: block; margin-bottom: 8px; color: #2D3B45;">How to get your Canvas API token:</strong>
-            <ol style="margin: 0; padding-left: 20px; line-height: 1.6;">
-                <li>Go to your Canvas account settings</li>
-                <li>Click on "Approved Integrations" or "New Access Token"</li>
-                <li>Generate a new token and copy it</li>
-                <li>Paste it in the field above</li>
-            </ol>
-        </div>
-        
-        <div id="login-error" style="margin-top: 15px; color: red; text-align: center; display: none;"></div>
+    <!-- Header: Fixed Height -->
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; border-bottom: 1px solid #eee; background: white; flex-shrink: 0;">
+        <h2 style="margin:0; font-size: 1.4rem; color: #2D3B45;">Social Spaces</h2>
+        <button id="ubc-tray-close" style="background:none; border:none; font-size: 1.8rem; cursor:pointer; color: #888;">&times;</button>
     </div>
 
-    <!-- Main Content (Hidden until logged in) -->
-    <div id="main-content" style="display: none;">
-        <!-- Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; border-bottom: 1px solid #eee; background: white;">
-            <h2 style="margin:0; font-size: 1.4rem; color: #2D3B45;">Social Spaces</h2>
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button id="logout-btn" style="background:none; border:none; color: #666; cursor:pointer; font-size: 0.9rem; padding: 5px 10px;">Logout</button>
-                <button id="ubc-tray-close" style="background:none; border:none; font-size: 1.8rem; cursor:pointer; color: #888;">&times;</button>
-            </div>
-        </div>
-
-    <!-- VIEW 1: Onboarding (Sidebar Style) -->
-    <div id="view-onboarding" style="display: block;">
+    <!-- VIEW 1: Onboarding -->
+    <!-- Added min-height: 0 to force scrollbar when content overflows -->
+    <div id="view-onboarding" style="display: block; flex: 1; min-height: 0; overflow-y: auto; padding: 20px;">
         <h3 style="margin-top: 0;">Find Your Community</h3>
         <p style="font-size:0.95em; color:#666; margin-bottom: 20px;">Tell us about yourself to see what's happening on campus.</p>
         
@@ -64,38 +34,39 @@
             <textarea id="ai-interests" rows="3" placeholder="I like hiking, chess, and coding..." style="width:100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family:inherit;"></textarea>
         </div>
 
-        <button id="ai-submit-btn" style="width:100%; background:#0374B5; color:white; padding:12px; border:none; border-radius:6px; cursor:pointer; font-weight: bold; font-size: 1rem;">
+        <button id="ai-submit-btn" style="width:100%; background:#0055B7; color:white; padding:12px; border:none; border-radius:6px; cursor:pointer; font-weight: bold; font-size: 1rem;">
             Generate Recommendations
         </button>
         
         <div id="ai-results-area" style="margin-top: 25px;"></div>
     </div>
 
-    <!-- VIEW 2: Dashboard (Full Width) -->
-    <div id="view-dashboard" style="display: none; height: 100%; flex-direction: column;">
+    <!-- VIEW 2: Dashboard -->
+    <!-- Added min-height: 0 to container so it doesn't push off screen -->
+    <div id="view-dashboard" style="display: none; flex: 1; flex-direction: column; min-height: 0; overflow: hidden;">
         
-        <!-- Tabs -->
-        <div style="display: flex; background: white; border-bottom: 1px solid #ddd; padding: 0 20px;">
+        <!-- Tabs: Fixed Height -->
+        <div style="display: flex; background: white; border-bottom: 1px solid #ddd; padding: 0 20px; flex-shrink: 0;">
             <button class="nav-tab active" data-target="tab-school" style="flex:1; padding: 15px;">School</button>
             <button class="nav-tab" data-target="tab-clubs" style="flex:1; padding: 15px;">Clubs</button>
             <button class="nav-tab" data-target="tab-class" style="flex:1; padding: 15px;">Class</button>
             <button class="nav-tab" data-target="tab-groups" style="flex:1; padding: 15px;">Groups</button>
         </div>
 
-        <!-- Content Area -->
-        <div id="dashboard-content">
+        <!-- Content Area: Flex 1 to take remaining space -->
+        <div id="dashboard-content" style="flex: 1; overflow-y: auto; padding: 20px; position: relative;">
             
             <!-- 1. School Feed -->
             <div id="tab-school" class="tab-content">
                 <h3 style="margin-top:0;">Campus Feed</h3>
                 
-                <!-- School Wide Announcement (New) -->
-                <div class="dashboard-card" style="border-left: 4px solid #0374B5; background-color: #f8fbff;">
+                <!-- School Wide Announcement -->
+                <div class="dashboard-card" style="border-left: 4px solid #0055B7; background-color: #f8fbff;">
                     <div style="display:flex; justify-content:space-between;">
-                        <strong>Campus Announcement</strong>
-                        <span style="font-size:0.8em; color:#0374B5;">Pinned</span>
+                        <strong>📢 Campus Announcement</strong>
+                        <span style="font-size:0.8em; color:#0055B7;">Pinned</span>
                     </div>
-                    <p style="margin: 5px 0;">Looking to get involved? Check out the <a href="https://students.ok.ubc.ca/career-experience/experience-involvement-hub/" target="_blank" style="color:#0374B5; font-weight:bold; text-decoration:none;">Experience Involvement Hub</a> for volunteering, co-ops, and career building opportunities.</p>
+                    <p style="margin: 5px 0;">Looking to get involved? Check out the <a href="https://students.ok.ubc.ca/career-experience/experience-involvement-hub/" target="_blank" style="color:#0055B7; font-weight:bold; text-decoration:none;">Experience Involvement Hub</a> for volunteering, co-ops, and career building opportunities.</p>
                 </div>
 
                 <div id="feed-posts" style="margin-bottom: 30px;"></div>
@@ -112,10 +83,41 @@
                 <div id="all-clubs-list"></div>
             </div>
 
-            <!-- 3. Class Announcements -->
+            <!-- 3. Class Announcements & List -->
             <div id="tab-class" class="tab-content" style="display:none;">
-                <h3>My Classes</h3>
-                <div id="all-classes-list"></div>
+                
+                <!-- Static Announcements -->
+                <h3>Recent Announcements</h3>
+                
+                <div class="dashboard-card" style="border-left: 4px solid #0055B7;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <strong>Dr. Yves Lucet (COSC 310)</strong>
+                        <small style="color:grey">2 hours ago</small>
+                    </div>
+                    <p style="margin:0; font-size:0.95em;">Project milestone 2 has been extended to Friday night. Please check the rubric updates on Canvas.</p>
+                </div>
+
+                <div class="dashboard-card" style="border-left: 4px solid #D32F2F;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <strong>Prof. Amy Weibe (MATH 200)</strong>
+                        <small style="color:grey">Yesterday</small>
+                    </div>
+                    <p style="margin:0; font-size:0.95em;"><strong>Urgent:</strong> Midterm room change! We are now in EME 0050, NOT the gym.</p>
+                </div>
+
+                <div class="dashboard-card">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <strong>Teaching Assistant (ENGL 112)</strong>
+                        <small style="color:grey">2 days ago</small>
+                    </div>
+                    <p style="margin:0; font-size:0.95em;">Office hours are moved to 4 PM today.</p>
+                </div>
+
+                <!-- Dynamic Class List Container -->
+                <h3 style="margin-top: 30px;">My Classes</h3>
+                <div id="all-classes-list">
+                    <p style="color:grey; font-style:italic; padding:10px;">Loading your classes...</p>
+                </div>
             </div>
 
             <!-- 4. Group Chats -->
@@ -129,6 +131,5 @@
             </div>
 
         </div>
-    </div>
     </div>
 </div>
