@@ -7,7 +7,7 @@
     position: fixed;
     top: 0;
     /* Start hidden to the left, behind the nav bar */
-    left: -420px; 
+    left: -100vw;
     width: 400px; /* Default width for Onboarding */
     height: 100vh;
     background: white;
