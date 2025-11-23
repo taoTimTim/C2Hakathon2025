@@ -573,4 +573,18 @@ function createCardHTML(item, showScore=false) {
             </div>
         </div>
     `;
+
+window.openGroupChat = function(groupId) {
+    console.log(`Opening chat for group ${groupId}`);
+    // You can add logic here later to actually switch tabs or open the chat window
+    alert(`Opening chat for group ${groupId}`); 
+};
+
+// Restores the "Details" logger if you need it for debugging
+window.viewClassDetails = function(classId) {
+    console.log(`Viewing details for class ${classId}`);
+};  
+
+
+    
 }
