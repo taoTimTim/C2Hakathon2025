@@ -1,0 +1,34 @@
+{
+  "manifest_version": 2,
+  "name": "UBC Canvas Club Connector",
+  "version": "1.1",
+  "description": "Adds a Clubs button to the global navigation and fetches recommendations.",
+  "permissions": [
+    "storage",
+    "https://canvas.ubc.ca/*",
+    "https://*.ubc.ca/*",
+    "http://127.0.0.1:5000/*",
+    "http://localhost:5000/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://canvas.ubc.ca/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    "canvas_connect.html"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ubc-canvas-club-connector@example.com"
+    }
+  }
+}
+

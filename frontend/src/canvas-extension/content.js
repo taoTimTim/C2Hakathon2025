@@ -1,14 +1,17 @@
+// Browser API compatibility (works for both Chrome and Firefox)
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
 async function safeFetch(url, options = {}) {
     return new Promise((resolve, reject) => {
         // Ensure background script is ready
         try {
-            chrome.runtime.sendMessage(
+            browserAPI.runtime.sendMessage(
                 { action: "fetch", url, options },
                 (response) => {
                     // Check for runtime errors (e.g., background script not responding)
-                    if (chrome.runtime.lastError) {
-                        console.error('Background script error:', chrome.runtime.lastError);
-                        return reject(chrome.runtime.lastError.message || "Background script error. Please reload the extension.");
+                    if (browserAPI.runtime.lastError) {
+                        console.error('Background script error:', browserAPI.runtime.lastError);
+                        return reject(browserAPI.runtime.lastError.message || "Background script error. Please reload the extension.");
                     }
                     if (!response) {
                         console.error('No response from background script');
@@ -226,8 +229,8 @@ async function toggleTray() {
     }
 
     try {
-        const url = chrome.runtime.getURL('canvas_connect.html');
-        const html = await chrome.runtime.getURL('canvas_connect.html')
+        const url = browserAPI.runtime.getURL('canvas_connect.html');
+        const html = await browserAPI.runtime.getURL('canvas_connect.html')
         ? await (await fetch(url)).text() 
         : ""; 
 

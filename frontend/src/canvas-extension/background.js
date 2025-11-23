@@ -1,7 +1,16 @@
-// Initialize background service worker
-console.log('Background service worker initialized');
+// Initialize background script (works for both Chrome MV3 and Firefox MV2)
+console.log('Background script starting...');
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+// Use browser API for Firefox compatibility (Chrome also supports it)
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
+// Handle installation/update
+browserAPI.runtime.onInstalled.addListener((details) => {
+    console.log('Extension installed/updated:', details.reason);
+});
+
+// Listen for messages from content scripts
+browserAPI.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === "fetch") {
         // Perform async fetch operation
         console.log('Background fetch:', msg.url, msg.options);
@@ -50,7 +59,3 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return false;
 });
 
-// Keep service worker alive by listening to events
-chrome.runtime.onInstalled.addListener(() => {
-    console.log('Extension installed/updated');
-});
