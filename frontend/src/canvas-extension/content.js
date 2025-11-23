@@ -56,7 +56,7 @@ function initExtension(globalNav) {
     });
 
     // --- POSITIONING FIX ---
-    const targetIndex = 6; 
+    const targetIndex = 3; 
     if (globalNav.children.length > targetIndex) {
         globalNav.insertBefore(navItem, globalNav.children[targetIndex]);
     } else {
