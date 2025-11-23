@@ -46,7 +46,7 @@ def get_messages(room_id: int):
 @router.post("/rooms/{room_id}/messages")
 def send_message(room_id: int, message: MessageCreate):
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(dictionary=True)
 
     sql = """
         INSERT INTO messages (room_id, user_id, content)
@@ -58,16 +58,28 @@ def send_message(room_id: int, message: MessageCreate):
 
     message_id = cur.lastrowid
 
+    # Fetch the complete message with user info
+    cur.execute("""
+        SELECT
+            m.id,
+            m.room_id,
+            m.user_id,
+            m.content,
+            m.created_at,
+            m.is_edited,
+            m.edited_at,
+            u.name as user_name
+        FROM messages m
+        LEFT JOIN users u ON m.user_id = u.canvas_user_id
+        WHERE m.id = %s
+    """, (message_id,))
+
+    complete_message = cur.fetchone()
+
     cur.close()
     conn.close()
 
-    return {
-        "status": "success",
-        "message_id": message_id,
-        "room_id": room_id,
-        "user_id": message.user_id,
-        "content": message.content
-    }
+    return complete_message
 
 # edit a message
 @router.patch("/messages/{message_id}")

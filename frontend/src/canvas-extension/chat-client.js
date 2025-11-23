@@ -161,8 +161,15 @@ class ChatClient {
 
             console.log('Message sent:', message);
 
-            // Immediately poll for the new message
-            setTimeout(() => this.pollMessages(), 100);
+            // Immediately display the sent message
+            if (message && message.id) {
+                this.messageHandlers.forEach(handler => handler(message, false));
+
+                // Update the last message ID for this room
+                if (this.lastMessageIdByRoom[roomId] === null || message.id > this.lastMessageIdByRoom[roomId]) {
+                    this.lastMessageIdByRoom[roomId] = message.id;
+                }
+            }
 
         } catch (error) {
             console.error('Error sending message:', error);
