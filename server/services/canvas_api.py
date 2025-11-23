@@ -1,6 +1,7 @@
 import requests
 from config import Config
 from services.room_service import RoomService
+from services.user_service import UserService
 
 class CanvasAPI:
     """Service for interacting with Canvas API"""
@@ -49,12 +50,16 @@ class CanvasAPI:
             return None
 
     def get_user_courses(self):
-        """Get all courses for the current user"""
-        return self._make_request('courses')
+        """Get all active courses for the current user"""
+        return self._make_request('courses?enrollment_state=active&per_page=100')
 
     def get_course_users(self, course_id):
         """Get all users enrolled in a specific course"""
-        return self._make_request(f'courses/{course_id}/users')
+        try:
+            return self._make_request(f'courses/{course_id}/users?per_page=100')
+        except Exception as e:
+            print(f"Warning: Could not fetch users for course {course_id}: {e}")
+            return []
 
     def get_course_groups(self, course_id):
         """Get all groups for a specific course"""
@@ -76,55 +81,107 @@ class CanvasAPI:
         """
         try:
             room_service = RoomService()
+            user_service = UserService()
             synced_courses = 0
             synced_groups = 0
             synced_members = 0
 
             # Sync Courses (class-wide chats)
+            print(f"[SYNC] Fetching courses for user {user_id}...")
             courses = self.get_user_courses()
+            print(f"[SYNC] Found {len(courses)} courses")
+
             for course in courses:
-                course_id = course['id']
-                course_name = course.get('name', f'Course {course_id}')
+                try:
+                    course_id = course.get('id')
+                    course_name = course.get('name', f'Course {course_id}')
 
-                # Create or get room (using Canvas course ID as room ID)
-                room = room_service.get_room_by_id(course_id)
+                    print(f"[SYNC] Processing course: {course_name} (ID: {course_id})")
 
-                if not room:
-                    # Create new room (system-generated)
-                    room_service.create_room(course_name, created_by=None)
-                    synced_courses += 1
+                    # Create or get room (using Canvas course ID as room ID)
+                    room = room_service.get_room_by_id(course_id)
 
-                # Get course users from Canvas
-                course_users = self.get_course_users(course_id)
+                    if not room:
+                        # Create new room with Canvas course ID
+                        print(f"[SYNC] Creating room for course {course_id}")
+                        room_service.create_room(course_name, created_by=None, room_id=course_id, room_type='class')
+                        synced_courses += 1
+                    else:
+                        print(f"[SYNC] Room already exists for course {course_id}")
 
-                # Add users to room
-                for course_user in course_users:
-                    user_id_member = course_user['id']
-                    room_service.add_user_to_room(user_id_member, course_id)
-                    synced_members += 1
+                    # Get course users from Canvas
+                    course_users = self.get_course_users(course_id)
+                    print(f"[SYNC] Found {len(course_users)} users in course {course_id}")
+
+                    # Create users and add them to room
+                    for course_user in course_users:
+                        try:
+                            # Ensure user exists in database first
+                            user_service.create_or_update_user(course_user)
+
+                            # Now add to room
+                            user_id_member = str(course_user['id'])
+                            room_service.add_user_to_room(user_id_member, course_id)
+                            synced_members += 1
+                        except Exception as e:
+                            print(f"[SYNC] Warning: Failed to add user {course_user.get('id')} to room {course_id}: {e}")
+
+                except Exception as e:
+                    print(f"[SYNC] Error processing course {course.get('id', 'unknown')}: {e}")
 
             # Sync Groups (group chats)
+            print(f"[SYNC] Fetching groups for user {user_id}...")
             groups = self.get_user_groups()
+            print(f"[SYNC] Found {len(groups)} groups")
+
             for group in groups:
-                group_id = group['id']
-                group_name = group['name']
+                try:
+                    group_id = group['id']
+                    group_name = group['name']
 
-                # Create or get room (using Canvas group ID as room ID)
-                room = room_service.get_room_by_id(group_id)
+                    print(f"[SYNC] Processing group: {group_name} (ID: {group_id})")
 
-                if not room:
-                    # Create new room (system-generated)
-                    room_service.create_room(group_name, created_by=None)
-                    synced_groups += 1
+                    # Create or get room (using Canvas group ID as room ID)
+                    room = room_service.get_room_by_id(group_id)
 
-                # Get group members from Canvas
-                members = self.get_group_members(group_id)
+                    if not room:
+                        # Create new room with Canvas group ID
+                        print(f"[SYNC] Creating room for group {group_id}")
+                        room_service.create_room(group_name, created_by=None, room_id=group_id, room_type='project')
+                        synced_groups += 1
+                    else:
+                        print(f"[SYNC] Room already exists for group {group_id}")
 
-                # Add members to room
-                for member in members:
-                    member_id = member['id']
-                    room_service.add_user_to_room(member_id, group_id)
-                    synced_members += 1
+                    # Get group members from Canvas (may fail with 403)
+                    try:
+                        members = self.get_group_members(group_id)
+                        print(f"[SYNC] Found {len(members)} members in group {group_id}")
+
+                        # Create users and add members to room
+                        for member in members:
+                            try:
+                                # Ensure user exists in database first
+                                user_service.create_or_update_user(member)
+
+                                # Now add to room
+                                member_id = str(member['id'])
+                                room_service.add_user_to_room(member_id, group_id)
+                                synced_members += 1
+                            except Exception as e:
+                                print(f"[SYNC] Warning: Failed to add user {member.get('id')} to group {group_id}: {e}")
+                    except Exception as e:
+                        print(f"[SYNC] Warning: Could not fetch members for group {group_id}: {e}")
+                        # Still create the room, just can't add members yet
+                        # At minimum, add the current user if they exist in users table
+                        try:
+                            # Note: user_id here is the logged-in user, may need to ensure they exist
+                            room_service.add_user_to_room(str(user_id), group_id)
+                            synced_members += 1
+                        except Exception as inner_e:
+                            print(f"[SYNC] Warning: Could not add current user to group {group_id}: {inner_e}")
+
+                except Exception as e:
+                    print(f"[SYNC] Error processing group {group.get('id', 'unknown')}: {e}")
 
             return {
                 'synced_courses': synced_courses,
