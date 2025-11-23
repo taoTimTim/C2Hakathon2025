@@ -8,11 +8,11 @@
     position: fixed;
     top: 0;
     /* CRITICAL FIX: Hide completely off screen */
-    left: -100vw; 
-    width: 400px; 
+    left: -100vw;
+    width: 400px;
     height: 100vh;
     background: white;
-    z-index: 9999; 
+    z-index: 50;
     box-shadow: 2px 0 15px rgba(0,0,0,0.15);
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
     display: flex !important;
@@ -24,7 +24,7 @@
 }
 
 #ubc-clubs-tray.tray-open {
-    left: 84px; 
+    left: 84px;
 }
 
 #ubc-clubs-tray.tray-full-width {
@@ -57,7 +57,7 @@
 
 .nav-tab.active {
     background: white !important;
-    border-bottom: 3px solid #0055B7 !important; 
+    border-bottom: 3px solid #0055B7 !important;
     font-weight: bold;
     color: #0055B7;
 }
@@ -69,7 +69,7 @@
     border-radius: 8px;
     background: white;
     transition: transform 0.2s, box-shadow 0.2s;
-    display: block; 
+    display: block;
 }
 
 .dashboard-card:hover {
