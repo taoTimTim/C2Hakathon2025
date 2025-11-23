@@ -84,3 +84,30 @@ class UserService:
         finally:
             cursor.close()
             conn.close()
+
+    def create_or_update_users_batch(self, users_info):
+        """
+        Batch create or update users from Canvas user info (for Canvas sync optimization)
+        users_info: list of {id: int, name: string, ...}
+        """
+        if not users_info:
+            return
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Batch insert/update using ON DUPLICATE KEY UPDATE
+            values = [(str(user['id']), user.get('name', 'Unknown'), 'student') for user in users_info]
+
+            cursor.executemany("""
+                INSERT INTO users (canvas_user_id, name, role)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE name = VALUES(name)
+            """, values)
+
+            conn.commit()
+
+        finally:
+            cursor.close()
+            conn.close()
