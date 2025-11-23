@@ -10,6 +10,9 @@ app = Flask(__name__)
 # --- CRITICAL FIX: Allow all origins explicitly ---
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+# Get the directory where this script is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Global variables
 tfidf_vectorizer = None
 tfidf_matrix = None
@@ -25,35 +28,51 @@ def load_and_train_model():
     # Initialize empty dataframes
     dfs = [] 
     
+    # Define CSV file paths relative to script directory
+    clubs_path = os.path.join(BASE_DIR, 'clubs.csv')
+    events_path = os.path.join(BASE_DIR, 'events.csv')
+    groups_path = os.path.join(BASE_DIR, 'groups.csv')
+    
+    print(f"[DEBUG] Looking for CSV files in: {BASE_DIR}")
+    print(f"[DEBUG] clubs.csv exists: {os.path.exists(clubs_path)}")
+    print(f"[DEBUG] events.csv exists: {os.path.exists(events_path)}")
+    print(f"[DEBUG] groups.csv exists: {os.path.exists(groups_path)}")
+    
     # 1. Load Clubs
-    if os.path.exists('clubs.csv'):
+    if os.path.exists(clubs_path):
         try:
-            df = pd.read_csv('clubs.csv', keep_default_na=False)
+            df = pd.read_csv(clubs_path, keep_default_na=False)
             print(f"Loaded {len(df)} clubs.")
             dfs.append(df)
         except Exception as e:
             print(f"Error loading clubs.csv: {e}")
+    else:
+        print(f"clubs.csv not found at: {clubs_path}")
 
     # 2. Load Events
-    if os.path.exists('events.csv'):
+    if os.path.exists(events_path):
         try:
             # Added error_bad_lines=False logic (via on_bad_lines for newer pandas) to skip broken rows
-            df = pd.read_csv('events.csv', keep_default_na=False)
+            df = pd.read_csv(events_path, keep_default_na=False)
             if 'contact' not in df.columns: df['contact'] = "" 
             print(f"Loaded {len(df)} events.")
             dfs.append(df)
         except Exception as e:
             print(f"Error loading events.csv: {e}")
+    else:
+        print(f"events.csv not found at: {events_path}")
 
     # 3. Load Groups
-    if os.path.exists('groups.csv'):
+    if os.path.exists(groups_path):
         try:
-            df = pd.read_csv('groups.csv', keep_default_na=False)
+            df = pd.read_csv(groups_path, keep_default_na=False)
             if 'contact' not in df.columns: df['contact'] = "" 
             print(f"Loaded {len(df)} groups.")
             dfs.append(df)
         except Exception as e:
             print(f"Error loading groups.csv: {e}")
+    else:
+        print(f"groups.csv not found at: {groups_path}")
 
     # 4. Merge or Fallback
     if len(dfs) > 0:
