@@ -569,6 +569,7 @@ async function loadClasses() {
 }
 
 function createClassCard(classItem) {
+    const escapedName = classItem.name.replace(/'/g, "\\'");
     return `
         <div class="dashboard-card class-card" data-class-id="${classItem.id}">
             <div style="display:flex; justify-content:space-between; align-items:start;">
@@ -578,7 +579,7 @@ function createClassCard(classItem) {
             <p style="font-size:0.9em; color:#555;">Course ID: ${classItem.id}</p>
             <p style="font-size:0.85em; color:#777;">Added: ${new Date(classItem.created_at).toLocaleDateString()}</p>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
-                <button class="btn-open-chat" onclick="openClassChat(${classItem.id})" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
+                <button class="btn-open-chat" onclick="openClassChat(${classItem.id}, '${escapedName}', 'class')" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
                 <button class="btn-view-details" onclick="viewClassDetails(${classItem.id})" style="padding:5px 10px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Details</button>
             </div>
         </div>
@@ -586,8 +587,13 @@ function createClassCard(classItem) {
 }
 
 // Global functions required for inline onclick events
-window.openClassChat = function(classId) {
+window.openClassChat = function(classId, className, roomType) {
     console.log(`Opening chat for class ${classId}`);
+    if (typeof openChat === 'function') {
+        openChat(classId, className, roomType);
+    } else {
+        console.error('openChat function not available');
+    }
 }
 
 window.viewClassDetails = function(classId) {
@@ -692,6 +698,7 @@ function loadGroups() {
 function createGroupCard(group, isJoined) {
     const badgeColor = group.room_type === 'personal' ? '#cff4fc' : '#fff3cd';
     const badgeText = group.room_type === 'personal' ? 'PERSONAL' : 'PROJECT';
+    const escapedName = group.name.replace(/'/g, "\\'");
 
     return `
         <div class="dashboard-card group-card" data-group-id="${group.id}">
@@ -703,7 +710,7 @@ function createGroupCard(group, isJoined) {
             ${group.max_members ? `<p style="font-size:0.85em; color:#777;">Max members: ${group.max_members}</p>` : ''}
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
-                    ? `<button onclick="openGroupChat(${group.id})" style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
+                    ? `<button onclick="openGroupChat(${group.id}, '${escapedName}', '${group.room_type}')" style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
                     : `<button onclick="joinGroup(${group.id})" style="padding:5px 10px; background:#0374B5; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
                 }
             </div>
@@ -711,8 +718,13 @@ function createGroupCard(group, isJoined) {
     `;
 }
 
-window.openGroupChat = function(groupId) {
+window.openGroupChat = function(groupId, groupName, roomType) {
     console.log(`Opening chat for group ${groupId}`);
+    if (typeof openChat === 'function') {
+        openChat(groupId, groupName, roomType);
+    } else {
+        console.error('openChat function not available');
+    }
 }
 
 window.joinGroup = function(groupId) {
