@@ -106,25 +106,20 @@ class CanvasAPI:
                         print(f"[SYNC] Creating room for course {course_id}")
                         room_service.create_room(course_name, created_by=None, room_id=course_id, room_type='class')
                         synced_courses += 1
+
+                        # Only fetch and add users for new rooms
+                        course_users = self.get_course_users(course_id)
+                        print(f"[SYNC] Found {len(course_users)} users in course {course_id}")
+
+                        # Batch create/update all users
+                        user_service.create_or_update_users_batch(course_users)
+
+                        # Batch add all users to room
+                        user_ids = [str(user['id']) for user in course_users]
+                        room_service.add_users_to_room_batch(user_ids, course_id)
+                        synced_members += len(user_ids)
                     else:
-                        print(f"[SYNC] Room already exists for course {course_id}")
-
-                    # Get course users from Canvas
-                    course_users = self.get_course_users(course_id)
-                    print(f"[SYNC] Found {len(course_users)} users in course {course_id}")
-
-                    # Create users and add them to room
-                    for course_user in course_users:
-                        try:
-                            # Ensure user exists in database first
-                            user_service.create_or_update_user(course_user)
-
-                            # Now add to room
-                            user_id_member = str(course_user['id'])
-                            room_service.add_user_to_room(user_id_member, course_id)
-                            synced_members += 1
-                        except Exception as e:
-                            print(f"[SYNC] Warning: Failed to add user {course_user.get('id')} to room {course_id}: {e}")
+                        print(f"[SYNC] Room already exists for course {course_id}, skipping user sync")
 
                 except Exception as e:
                     print(f"[SYNC] Error processing course {course.get('id', 'unknown')}: {e}")
@@ -149,36 +144,31 @@ class CanvasAPI:
                         print(f"[SYNC] Creating room for group {group_id}")
                         room_service.create_room(group_name, created_by=None, room_id=group_id, room_type='project')
                         synced_groups += 1
-                    else:
-                        print(f"[SYNC] Room already exists for group {group_id}")
 
-                    # Get group members from Canvas (may fail with 403)
-                    try:
-                        members = self.get_group_members(group_id)
-                        print(f"[SYNC] Found {len(members)} members in group {group_id}")
-
-                        # Create users and add members to room
-                        for member in members:
-                            try:
-                                # Ensure user exists in database first
-                                user_service.create_or_update_user(member)
-
-                                # Now add to room
-                                member_id = str(member['id'])
-                                room_service.add_user_to_room(member_id, group_id)
-                                synced_members += 1
-                            except Exception as e:
-                                print(f"[SYNC] Warning: Failed to add user {member.get('id')} to group {group_id}: {e}")
-                    except Exception as e:
-                        print(f"[SYNC] Warning: Could not fetch members for group {group_id}: {e}")
-                        # Still create the room, just can't add members yet
-                        # At minimum, add the current user if they exist in users table
+                        # Only fetch and add members for new rooms
                         try:
-                            # Note: user_id here is the logged-in user, may need to ensure they exist
-                            room_service.add_user_to_room(str(user_id), group_id)
-                            synced_members += 1
-                        except Exception as inner_e:
-                            print(f"[SYNC] Warning: Could not add current user to group {group_id}: {inner_e}")
+                            members = self.get_group_members(group_id)
+                            print(f"[SYNC] Found {len(members)} members in group {group_id}")
+
+                            # Batch create/update all members
+                            user_service.create_or_update_users_batch(members)
+
+                            # Batch add all members to room
+                            member_ids = [str(member['id']) for member in members]
+                            room_service.add_users_to_room_batch(member_ids, group_id)
+                            synced_members += len(member_ids)
+                        except Exception as e:
+                            print(f"[SYNC] Warning: Could not fetch members for group {group_id}: {e}")
+                            # Still create the room, just can't add members yet
+                            # At minimum, add the current user if they exist in users table
+                            try:
+                                # Note: user_id here is the logged-in user, may need to ensure they exist
+                                room_service.add_user_to_room(str(user_id), group_id)
+                                synced_members += 1
+                            except Exception as inner_e:
+                                print(f"[SYNC] Warning: Could not add current user to group {group_id}: {inner_e}")
+                    else:
+                        print(f"[SYNC] Room already exists for group {group_id}, skipping member sync")
 
                 except Exception as e:
                     print(f"[SYNC] Error processing group {group.get('id', 'unknown')}: {e}")
