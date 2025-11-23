@@ -58,7 +58,7 @@ def load_and_train_model():
             print(f"Loaded {len(df)} events.")
             dfs.append(df)
         except Exception as e:
-            print(f"❌ Error loading events.csv: {e}")
+            print(f"Error loading events.csv: {e}")
     else:
         print(f"events.csv not found at: {events_path}")
 
