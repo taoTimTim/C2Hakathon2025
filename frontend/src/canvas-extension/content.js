@@ -1,13 +1,27 @@
 async function safeFetch(url, options = {}) {
     return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-            { action: "fetch", url, options },
-            (response) => {
-                if (!response) return reject("No response received");
-                if (response.error) return reject(response.error);
-                resolve(response.data);
-            }
-        );
+        // Ensure background script is ready
+        try {
+            chrome.runtime.sendMessage(
+                { action: "fetch", url, options },
+                (response) => {
+                    // Check for runtime errors (e.g., background script not responding)
+                    if (chrome.runtime.lastError) {
+                        console.error('Background script error:', chrome.runtime.lastError);
+                        return reject(chrome.runtime.lastError.message || "Background script error. Please reload the extension.");
+                    }
+                    if (!response) {
+                        console.error('No response from background script');
+                        return reject("No response received. Please reload the extension.");
+                    }
+                    if (response.error) return reject(response.error);
+                    resolve(response.data);
+                }
+            );
+        } catch (error) {
+            console.error('Error sending message to background:', error);
+            reject(error.message || "Failed to communicate with background script");
+        }
     });
 }
 
@@ -455,28 +469,37 @@ function renderAIResults(items) {
 // New feature from teammate: Load Classes from backend
 async function loadClasses() {
     try {
-        const response = await fetch(`${API_BASE}/classes`, {
+        // Get session token from localStorage (set during login)
+        const sessionToken = localStorage.getItem('ubc_session_token');
+        if (!sessionToken) {
+            console.warn('No session token found, cannot load classes');
+            const container = document.getElementById('all-classes-list');
+            if (container) {
+                container.innerHTML = '<p class="no-data">Please log in to view classes</p>';
+            }
+            return;
+        }
+
+        const classes = await safeFetch(`${API_BASE}/classes`, {
             headers: {
-                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Authorization': `Bearer ${sessionToken}`,
                 'Content-Type': 'application/json'
             }
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const classes = await response.json();
         console.log("Classes loaded:", classes);
 
         const container = document.getElementById('all-classes-list');
         // Safety check in case HTML for classes doesn't exist yet
-        if (!container) return; 
+        if (!container) {
+            console.warn("Classes container not found");
+            return; 
+        }
 
         container.classList.add('grid-container');
         container.innerHTML = '';
 
-        if (classes.length === 0) {
+        if (!classes || classes.length === 0) {
             container.innerHTML = '<p class="no-data">No classes found</p>';
             return;
         }
@@ -486,6 +509,16 @@ async function loadClasses() {
         });
     } catch (error) {
         console.error("Error loading classes:", error);
+        console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+            error: error
+        });
+        
+        const container = document.getElementById('all-classes-list');
+        if (container) {
+            container.innerHTML = `<p class="no-data" style="color: red;">Error loading classes: ${error.message || error}</p>`;
+        }
     }
 }
 
