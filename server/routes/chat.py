@@ -102,7 +102,7 @@ def get_classes():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    response, status_code = proxy.forward_request('/classes', method='GET')
+    response, status_code = proxy.forward_request('/classes', method='GET', query_params={'user_id': user_id})
     return jsonify(response), status_code
 
 @bp.route('/posts', methods=['GET', 'POST'])
