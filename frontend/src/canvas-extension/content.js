@@ -534,7 +534,6 @@ function loadGroups() {
 function createGroupCard(group, isJoined) {
     const badgeColor = '#fff3cd'; 
     const badgeText = 'GROUP';
-    const uniqueId = `desc-group-${group.id || Math.random().toString(36).substr(2, 9)}`;
 
     return `
         <div class="dashboard-card group-card" data-group-id="${group.id}">
@@ -542,10 +541,9 @@ function createGroupCard(group, isJoined) {
                 <h4 style="margin:0 0 10px 0;">${group.name}</h4>
                 <span style="background:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${badgeText}</span>
             </div>
-            <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555;">
+            <p style="font-size:0.9em; color:#555; margin:0 0 10px 0;">
                 ${group.description || 'No description'}
             </p>
-            <span onclick="document.getElementById('${uniqueId}').classList.toggle('desc-full')" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline;">Read description</span>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
                     ? `<button style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
