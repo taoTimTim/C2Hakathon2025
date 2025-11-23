@@ -20,13 +20,9 @@ def get_all_clubs():
     cur = conn.cursor(dictionary=True)
 
     sql = """
-        SELECT r.id, r.name, r.description, r.created_by, r.created_at,
-               COUNT(rm.user_id) as members_count
-        FROM rooms r
-        LEFT JOIN room_members rm ON r.id = rm.room_id
-        WHERE r.room_type = 'club'
-        GROUP BY r.id, r.name, r.description, r.created_by, r.created_at
-        ORDER BY r.name ASC
+        SELECT id, name, description, category, contact, image_url, created_at
+        FROM clubs
+        ORDER BY name ASC
     """
 
     cur.execute(sql)

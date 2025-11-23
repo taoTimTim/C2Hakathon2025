@@ -4,6 +4,11 @@ from flask_cors import CORS
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
 import os
+import sys
+
+# Add parent directory to path to import db module
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db import get_connection
 
 app = Flask(__name__)
 
@@ -20,7 +25,7 @@ all_data_df = None
 
 def load_and_train_model():
     """
-    Loads clubs.csv, events.csv, AND groups.csv.
+    Loads clubs from database, events.csv, AND groups.csv.
     Merges them all and trains the model.
     """
     global tfidf_vectorizer, tfidf_matrix, all_data_df
@@ -29,25 +34,44 @@ def load_and_train_model():
     dfs = [] 
     
     # Define CSV file paths relative to script directory
-    clubs_path = os.path.join(BASE_DIR, 'clubs.csv')
     events_path = os.path.join(BASE_DIR, 'events.csv')
     groups_path = os.path.join(BASE_DIR, 'groups.csv')
     
-    print(f"[DEBUG] Looking for CSV files in: {BASE_DIR}")
-    print(f"[DEBUG] clubs.csv exists: {os.path.exists(clubs_path)}")
-    print(f"[DEBUG] events.csv exists: {os.path.exists(events_path)}")
-    print(f"[DEBUG] groups.csv exists: {os.path.exists(groups_path)}")
-    
-    # 1. Load Clubs
-    if os.path.exists(clubs_path):
-        try:
-            df = pd.read_csv(clubs_path, keep_default_na=False)
-            print(f"Loaded {len(df)} clubs.")
+    # 1. Load Clubs from Database
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        
+        sql = """
+            SELECT id, name, description, category, contact, image_url
+            FROM clubs
+            ORDER BY name ASC
+        """
+        cur.execute(sql)
+        clubs_data = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        if clubs_data:
+            # Convert to DataFrame
+            df = pd.DataFrame(clubs_data)
+            df = df.fillna("")  # Fill NaN with empty strings
+            print(f"Loaded {len(df)} clubs from database.")
             dfs.append(df)
-        except Exception as e:
-            print(f"Error loading clubs.csv: {e}")
-    else:
-        print(f"clubs.csv not found at: {clubs_path}")
+        else:
+            print("No clubs found in database.")
+    except Exception as e:
+        print(f"Error loading clubs from database: {e}")
+        # Fallback to CSV if database fails
+        clubs_path = os.path.join(BASE_DIR, 'clubs.csv')
+        if os.path.exists(clubs_path):
+            try:
+                df = pd.read_csv(clubs_path, keep_default_na=False)
+                print(f"Fallback: Loaded {len(df)} clubs from CSV.")
+                dfs.append(df)
+            except Exception as csv_error:
+                print(f"Error loading clubs.csv: {csv_error}")
 
     # 2. Load Events
     if os.path.exists(events_path):
