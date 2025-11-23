@@ -1,3 +1,71 @@
+// Browser API compatibility (works for both Chrome and Firefox)
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
+// Keep background service worker alive with persistent connection
+let keepAliveConnection = null;
+
+function maintainBackgroundConnection() {
+    try {
+        // Create persistent connection to keep service worker alive
+        keepAliveConnection = browserAPI.runtime.connect({ name: 'keepAlive' });
+        
+        keepAliveConnection.onDisconnect.addListener(() => {
+            // Reconnect if connection is lost
+            console.log('Background connection lost, reconnecting...');
+            setTimeout(maintainBackgroundConnection, 1000);
+        });
+        
+        // Send periodic pings to keep connection alive
+        const pingInterval = setInterval(() => {
+            if (keepAliveConnection) {
+                try {
+                    keepAliveConnection.postMessage({ action: 'ping' });
+                } catch (e) {
+                    clearInterval(pingInterval);
+                    maintainBackgroundConnection();
+                }
+            }
+        }, 20000); // Ping every 20 seconds
+        
+        console.log('Background connection established');
+    } catch (error) {
+        console.error('Failed to establish background connection:', error);
+        // Retry after a delay
+        setTimeout(maintainBackgroundConnection, 2000);
+    }
+}
+
+// Establish connection when content script loads
+maintainBackgroundConnection();
+
+async function safeFetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        // Ensure background script is ready
+        try {
+            browserAPI.runtime.sendMessage(
+                { action: "fetch", url, options },
+                (response) => {
+                    // Check for runtime errors (e.g., background script not responding)
+                    if (browserAPI.runtime.lastError) {
+                        console.error('Background script error:', browserAPI.runtime.lastError);
+                        return reject(browserAPI.runtime.lastError.message || "Background script error. Please reload the extension.");
+                    }
+                    if (!response) {
+                        console.error('No response from background script');
+                        return reject("No response received. Please reload the extension.");
+                    }
+                    if (response.error) return reject(response.error);
+                    resolve(response.data);
+                }
+            );
+        } catch (error) {
+            console.error('Error sending message to background:', error);
+            reject(error.message || "Failed to communicate with background script");
+        }
+    });
+}
+
+
 // ===========================================================
 // ROBUST VERSION - Left Tray & Full Screen Dashboard
 // ===========================================================
@@ -198,27 +266,57 @@ async function toggleTray() {
     }
 
     try {
-        const url = chrome.runtime.getURL('canvas_connect.html');
-        const response = await fetch(url);
-        const html = await response.text();
+        const url = browserAPI.runtime.getURL('canvas_connect.html');
+        const html = await browserAPI.runtime.getURL('canvas_connect.html')
+        ? await (await fetch(url)).text() 
+        : ""; 
 
         const trayContainer = document.createElement('div');
         trayContainer.id = 'ubc-clubs-tray-container';
         trayContainer.innerHTML = html;
         document.body.appendChild(trayContainer);
 
-        document.getElementById('ubc-tray-close').addEventListener('click', () => {
-            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-            setMenuIconActive(false);
-        });
-
-        if (localStorage.getItem('ubc_social_onboarded') === 'true') {
-            showDashboard();
+        // Check if user is logged in
+        const sessionToken = localStorage.getItem('ubc_session_token');
+        if (!sessionToken) {
+            // Show login view only
+            const loginView = document.getElementById('view-login');
+            const mainContent = document.getElementById('main-content');
+            if (loginView) loginView.style.display = 'block';
+            if (mainContent) mainContent.style.display = 'none';
+            setupLoginHandler();
         } else {
-            showOnboarding();
-        }
+            // User is logged in, show main content
+            const loginView = document.getElementById('view-login');
+            const mainContent = document.getElementById('main-content');
+            
+            if (loginView) loginView.style.display = 'none';
+            if (mainContent) mainContent.style.display = 'block';
+            
+            // Close Handler
+            const closeBtn = document.getElementById('ubc-tray-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+                    menutab.classList.toggle('ic-app-header__menu-list-item--active');
+                });
+            }
+            
+            // Logout Handler
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', handleLogout);
+            }
 
-        setupEventHandlers();
+            // VIEW LOGIC
+            if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+                showDashboard();
+            } else {
+                showOnboarding();
+            }
+
+            setupEventHandlers();
+        }
 
         setTimeout(() => {
             document.getElementById('ubc-clubs-tray').classList.add('tray-open');
@@ -227,6 +325,104 @@ async function toggleTray() {
 
     } catch (err) {
         console.error("ERROR:", err);
+    }
+}
+
+function setupLoginHandler() {
+    const loginBtn = document.getElementById('login-submit-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleLogin);
+    }
+    
+    const tokenInput = document.getElementById('login-token');
+    if (tokenInput) {
+        tokenInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+    }
+}
+
+function handleLogout() {
+    // Clear session token
+    localStorage.removeItem('ubc_session_token');
+    
+    // Reset tray to original size (remove full-width)
+    const tray = document.getElementById('ubc-clubs-tray');
+    if (tray) {
+        tray.classList.remove('tray-full-width');
+    }
+    
+    // Hide main content, show login
+    const loginView = document.getElementById('view-login');
+    const mainContent = document.getElementById('main-content');
+    if (loginView) loginView.style.display = 'block';
+    if (mainContent) mainContent.style.display = 'none';
+    
+    // Clear the token input field
+    const tokenInput = document.getElementById('login-token');
+    if (tokenInput) tokenInput.value = '';
+    
+    // Setup login handler again
+    setupLoginHandler();
+}
+
+async function handleLogin() {
+    const tokenInput = document.getElementById('login-token');
+    const loginBtn = document.getElementById('login-submit-btn');
+    const errorDiv = document.getElementById('login-error');
+    
+    const canvasToken = tokenInput.value.trim();
+    
+    if (!canvasToken) {
+        errorDiv.textContent = 'Please enter your Canvas API token';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    loginBtn.innerText = 'Logging in...';
+    loginBtn.disabled = true;
+    errorDiv.style.display = 'none';
+    
+    try {
+        const response = await safeFetch('http://127.0.0.1:5000/api/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ canvas_token: canvasToken })
+        });
+        
+        if (!response.session_token) {
+            throw new Error('Invalid response from server');
+        }
+        
+        // Store session token
+        localStorage.setItem('ubc_session_token', response.session_token);
+        
+        // Hide login, show main content
+        document.getElementById('view-login').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        
+        // Setup close handler
+        document.getElementById('ubc-tray-close').addEventListener('click', () => {
+            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+            document.getElementById('ubc-clubs-nav-item').classList.toggle('ic-app-header__menu-list-item--active');
+        });
+        
+        // Show onboarding or dashboard
+        if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+            showDashboard();
+        } else {
+            showOnboarding();
+        }
+        
+        setupEventHandlers();
+        
+    } catch (e) {
+        errorDiv.textContent = e.message || 'Login failed. Please check your token.';
+        errorDiv.style.display = 'block';
+        loginBtn.innerText = 'Login';
+        loginBtn.disabled = false;
     }
 }
 
@@ -286,12 +482,12 @@ async function handleOnboardingSubmit() {
     const interests = document.getElementById('ai-interests').value;
 
     try {
-        const res = await fetch(API_RECOMMEND, {
+        const data = await safeFetch(API_RECOMMEND, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({year, classes, interests})
+            body: JSON.stringify({ year, classes, interests })
         });
-        const data = await res.json();
+        
         renderAIResults(data);
         
         btn.innerText = "Enter Social Space ->";
@@ -319,28 +515,37 @@ function renderAIResults(items) {
 // New feature from teammate: Load Classes from backend
 async function loadClasses() {
     try {
-        const response = await fetch(`${API_BASE}/classes`, {
+        // Get session token from localStorage (set during login)
+        const sessionToken = localStorage.getItem('ubc_session_token');
+        if (!sessionToken) {
+            console.warn('No session token found, cannot load classes');
+            const container = document.getElementById('all-classes-list');
+            if (container) {
+                container.innerHTML = '<p class="no-data">Please log in to view classes</p>';
+            }
+            return;
+        }
+
+        const classes = await safeFetch(`${API_BASE}/classes`, {
             headers: {
-                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Authorization': `Bearer ${sessionToken}`,
                 'Content-Type': 'application/json'
             }
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const classes = await response.json();
         console.log("Classes loaded:", classes);
 
         const container = document.getElementById('all-classes-list');
         // Safety check in case HTML for classes doesn't exist yet
-        if (!container) return; 
+        if (!container) {
+            console.warn("Classes container not found");
+            return; 
+        }
 
         container.classList.add('grid-container');
         container.innerHTML = '';
 
-        if (classes.length === 0) {
+        if (!classes || classes.length === 0) {
             container.innerHTML = '<p class="no-data">No classes found</p>';
             return;
         }
@@ -350,6 +555,16 @@ async function loadClasses() {
         });
     } catch (error) {
         console.error("Error loading classes:", error);
+        console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+            error: error
+        });
+        
+        const container = document.getElementById('all-classes-list');
+        if (container) {
+            container.innerHTML = `<p class="no-data" style="color: red;">Error loading classes: ${error.message || error}</p>`;
+        }
     }
 }
 
@@ -384,8 +599,8 @@ async function loadAllClubs() {
     if(!container) return;
     container.classList.add('grid-container'); 
     
-    const res = await fetch(API_ALL_ITEMS);
-    const items = await res.json();
+    const items = await safeFetch(API_ALL_ITEMS);
+
     container.innerHTML = '';
     items.forEach(item => {
         container.innerHTML += createCardHTML(item);
@@ -393,7 +608,8 @@ async function loadAllClubs() {
 }
 
 function loadSchoolFeed() {
-    fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
+    // Note: School feed usually isn't a grid, keep it linear or grid as preferred
+    safeFetch(API_ALL_ITEMS).then(items => {
         const eventContainer = document.getElementById('feed-events');
         eventContainer.classList.add('grid-container'); 
         const events = items.filter(i => i.category === 'Event');
@@ -404,14 +620,14 @@ function loadSchoolFeed() {
     });
 }
 
-async function loadGroups() {
-    try {
-        // Load user's joined rooms
-        const roomsResponse = await fetch(`${API_BASE}/rooms`, {
-            headers: {
-                'Authorization': `Bearer ${SESSION_TOKEN}`,
-                'Content-Type': 'application/json'
-            }
+function loadGroups() {
+    safeFetch(API_ALL_ITEMS).then(items => {
+        const groupContainer = document.getElementById('available-group-chats');
+        groupContainer.classList.add('grid-container'); 
+        const groups = items.filter(i => i.category === 'Group');
+        groupContainer.innerHTML = '';
+        groups.forEach(g => {
+            groupContainer.innerHTML += createCardHTML(g);
         });
 
         if (!roomsResponse.ok) {

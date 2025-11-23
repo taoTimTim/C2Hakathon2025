@@ -1,0 +1,17 @@
+{
+  "name": "ubc-canvas-extension",
+  "version": "1.1.0",
+  "description": "UBC Canvas Club Connector Extension",
+  "scripts": {
+    "build:chrome": "node build-manifest.js chrome",
+    "build:firefox": "node build-manifest.js firefox",
+    "build": "node build-manifest.js chrome"
+  },
+  "keywords": [
+    "chrome-extension",
+    "firefox-extension",
+    "canvas",
+    "ubc"
+  ]
+}
+

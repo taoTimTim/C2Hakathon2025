@@ -17,6 +17,16 @@ CORS(app, resources={
         "origins": os.getenv('ALLOWED_ORIGINS', '*').split(','),
         "methods": ["GET", "POST", "PUT", "DELETE"],
         "allow_headers": ["Content-Type", "Authorization"]
+    },
+    r"/recommend": {
+        "origins": os.getenv('ALLOWED_ORIGINS', '*').split(','),
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    },
+    r"/items": {
+        "origins": os.getenv('ALLOWED_ORIGINS', '*').split(','),
+        "methods": ["GET", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 
@@ -30,11 +40,12 @@ socketio = SocketIO(
 )
 
 # Import and register routes
-from routes import auth, chat, canvas_sync
+from routes import auth, chat, canvas_sync, recommendation
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(chat.bp)
 app.register_blueprint(canvas_sync.bp)
+app.register_blueprint(recommendation.bp)
 
 # Import socket event handlers
 from socket_events import connection_events, message_events, room_events

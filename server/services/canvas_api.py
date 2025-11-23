@@ -73,15 +73,34 @@ class CanvasAPI:
         """Get all members of a specific group"""
         return self._make_request(f'groups/{group_id}/users')
 
-    def sync_user_groups(self, user_id):
+    def sync_user_groups(self, user_id, force=False):
         """
         Sync Canvas courses and groups to chat rooms
         Creates rooms from user's Canvas courses (class-wide) and groups
-        Returns: {synced_courses: int, synced_groups: int, synced_members: int}
+        
+        Args:
+            user_id: Canvas user ID
+            force: If True, sync even if user already has rooms. If False, skip if already synced.
+        
+        Returns: {synced_courses: int, synced_groups: int, synced_members: int, skipped: bool}
         """
         try:
             room_service = RoomService()
             user_service = UserService()
+            
+            # Check if user already has rooms synced (quick check to avoid unnecessary API calls)
+            if not force:
+                existing_rooms = room_service.get_user_rooms(user_id)
+                if existing_rooms:
+                    print(f"[SYNC] User {user_id} already has {len(existing_rooms)} rooms synced. Skipping sync.")
+                    return {
+                        'synced_courses': 0,
+                        'synced_groups': 0,
+                        'synced_members': 0,
+                        'skipped': True,
+                        'message': 'Sync skipped - user already has rooms'
+                    }
+            
             synced_courses = 0
             synced_groups = 0
             synced_members = 0
@@ -176,7 +195,8 @@ class CanvasAPI:
             return {
                 'synced_courses': synced_courses,
                 'synced_groups': synced_groups,
-                'synced_members': synced_members
+                'synced_members': synced_members,
+                'skipped': False
             }
 
         except Exception as e:
