@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "UBC Canvas Club Connector",
+  "name": "UBC Canvas Connect",
   "version": "1.1",
-  "description": "Adds a Clubs button to the global navigation and fetches recommendations.",
+  "description": "Adds a Connect button to the global navigation and fetches recommendations.",
   "permissions": [
     "storage",
     "scripting",

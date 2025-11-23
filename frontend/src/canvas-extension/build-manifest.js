@@ -13,9 +13,9 @@ const browser = process.argv[2] || 'chrome';
 
 const chromeManifest = {
   "manifest_version": 3,
-  "name": "UBC Canvas Club Connector",
+  "name": "UBC Canvas Connect",
   "version": "1.1",
-  "description": "Adds a Clubs button to the global navigation and fetches recommendations.",
+  "description": "Adds a Connect button to the global navigation and fetches recommendations.",
   "permissions": [
     "storage",
     "scripting",
@@ -48,9 +48,9 @@ const chromeManifest = {
 
 const firefoxManifest = {
   "manifest_version": 2,
-  "name": "UBC Canvas Club Connector",
+  "name": "UBC Canvas Connect",
   "version": "1.1",
-  "description": "Adds a Clubs button to the global navigation and fetches recommendations.",
+  "description": "Adds a Connect button to the global navigation and fetches recommendations.",
   "permissions": [
     "storage",
     "https://canvas.ubc.ca/*",
@@ -95,4 +95,3 @@ if (browser === 'firefox') {
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 console.log(`✅ manifest.json generated for ${browser}`);
 console.log(`📁 Location: ${manifestPath}`);
-
