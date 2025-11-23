@@ -5,6 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
 import os
 import sys
+import requests
 
 # Add parent directory to path to import db module
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,6 +15,9 @@ app = Flask(__name__)
 
 # --- CRITICAL FIX: Allow all origins explicitly ---
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Flask API server URL (where server/app.py runs)
+FLASK_API_URL = os.getenv('FLASK_API_URL', 'http://127.0.0.1:5000')
 
 # Get the directory where this script is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -161,6 +165,44 @@ def recommend():
     except Exception as e:
         print(f"Error: {e}")
         return jsonify([])
+
+# Proxy all /api/* requests to the Flask API server
+@app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+def proxy_api(path):
+    """Proxy API requests to the Flask API server"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    url = f"{FLASK_API_URL}/api/{path}"
+    
+    # Forward all headers
+    headers = dict(request.headers)
+    # Remove Host header to avoid conflicts
+    headers.pop('Host', None)
+    
+    try:
+        if request.method == 'GET':
+            response = requests.get(url, headers=headers, params=request.args)
+        elif request.method == 'POST':
+            response = requests.post(url, headers=headers, json=request.get_json(), params=request.args)
+        elif request.method == 'PUT':
+            response = requests.put(url, headers=headers, json=request.get_json(), params=request.args)
+        elif request.method == 'DELETE':
+            response = requests.delete(url, headers=headers, params=request.args)
+        else:
+            return jsonify({"error": f"Unsupported method: {request.method}"}), 400
+        
+        # Return the response with same status code
+        try:
+            return jsonify(response.json()), response.status_code
+        except:
+            return response.text, response.status_code
+    
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": f"Flask API server at {FLASK_API_URL} is not reachable"}), 503
+    except Exception as e:
+        print(f"Proxy error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     load_and_train_model()
