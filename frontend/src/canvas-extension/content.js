@@ -1,21 +1,19 @@
-// Browser API compatibility (works for both Chrome and Firefox)
+// ===========================================================
+// FINAL VERSION - Fixed Text Inversion & Tray Closing
+// ===========================================================
+
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
-// Keep background service worker alive with persistent connection
+// --- KEEP ALIVE LOGIC ---
 let keepAliveConnection = null;
 
 function maintainBackgroundConnection() {
     try {
-        // Create persistent connection to keep service worker alive
         keepAliveConnection = browserAPI.runtime.connect({ name: 'keepAlive' });
-        
         keepAliveConnection.onDisconnect.addListener(() => {
-            // Reconnect if connection is lost
             console.log('Background connection lost, reconnecting...');
             setTimeout(maintainBackgroundConnection, 1000);
         });
-        
-        // Send periodic pings to keep connection alive
         const pingInterval = setInterval(() => {
             if (keepAliveConnection) {
                 try {
@@ -25,69 +23,56 @@ function maintainBackgroundConnection() {
                     maintainBackgroundConnection();
                 }
             }
-        }, 20000); // Ping every 20 seconds
-        
+        }, 20000); 
         console.log('Background connection established');
     } catch (error) {
         console.error('Failed to establish background connection:', error);
-        // Retry after a delay
         setTimeout(maintainBackgroundConnection, 2000);
     }
 }
-
-// Establish connection when content script loads
 maintainBackgroundConnection();
 
 async function safeFetch(url, options = {}) {
     return new Promise((resolve, reject) => {
-        // Ensure background script is ready
         try {
             browserAPI.runtime.sendMessage(
                 { action: "fetch", url, options },
                 (response) => {
-                    // Check for runtime errors (e.g., background script not responding)
                     if (browserAPI.runtime.lastError) {
                         console.error('Background script error:', browserAPI.runtime.lastError);
-                        return reject(browserAPI.runtime.lastError.message || "Background script error. Please reload the extension.");
+                        return reject(browserAPI.runtime.lastError.message || "Background script error.");
                     }
-                    if (!response) {
-                        console.error('No response from background script');
-                        return reject("No response received. Please reload the extension.");
-                    }
+                    if (!response) return reject("No response received.");
                     if (response.error) return reject(response.error);
                     resolve(response.data);
                 }
             );
         } catch (error) {
-            console.error('Error sending message to background:', error);
-            reject(error.message || "Failed to communicate with background script");
+            console.error('Error sending message:', error);
+            reject(error.message);
         }
     });
 }
 
-
-// ===========================================================
-// ROBUST VERSION - Left Tray & Full Screen Dashboard
-// ===========================================================
-
+// --- CONFIGURATION ---
 const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
 const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
-// Incoming features from teammate
 const API_BASE = 'http://localhost:5000/api';
 const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
 
-// COLORS (Your UI Fixes)
-const COLOR_ACTIVE_BG = '#FFFFFF';      // White background when open
-const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // Exact UBC Blue RGB
-const COLOR_INACTIVE_ICON = '#FFFFFF';  // White icon when closed
-const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; // Ensures tooltip text stays white
+// --- COLORS ---
+const COLOR_ACTIVE_BG = '#FFFFFF';      
+const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // UBC Navy
+const COLOR_INACTIVE_ICON = '#FFFFFF';  
+const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; 
 
-// STATE TRACKER (To restore the previous menu state)
+// --- STATE TRACKER ---
 let previousState = {
     element: null,
     hadClass: false,
     ariaCurrent: null
 };
+let originalPageTitle = document.title; 
 
 console.log("UBC Social Spaces: Script Loading...");
 
@@ -103,7 +88,6 @@ function startObserver() {
         initExtension(menu);
         return;
     }
-
     const observer = new MutationObserver((mutations, obs) => {
         const menu = document.getElementById('menu');
         if (menu) {
@@ -111,7 +95,6 @@ function startObserver() {
             obs.disconnect();
         }
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
@@ -122,7 +105,6 @@ function initExtension(globalNav) {
     navItem.id = 'ubc-clubs-nav-item';
     navItem.className = 'ic-app-header__menu-list-item'; 
     
-    // FORCE FULL WIDTH/HEIGHT for the white background effect
     navItem.style.position = 'relative';
     navItem.style.width = '100%'; 
     navItem.style.margin = '0'; 
@@ -131,7 +113,7 @@ function initExtension(globalNav) {
     navItem.innerHTML = `
         <a id="global_nav_clubs_link" href="#" class="ic-app-header__menu-list-link" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; background: transparent !important; border: none !important;">
             <div class="menu-item-icon-container" aria-hidden="true" style="position: relative; z-index: 20; display: flex; align-items: center; justify-content: center; background: transparent !important; border: none !important; margin: 0 !important;">
-                <svg class="ic-icon-svg ic-icon-svg--dashboard" xmlns="http://www.w3.org/2000/svg" height="26px" viewBox="0 -960 960 960" width="26px" fill="${COLOR_INACTIVE_ICON}" style="display: block; margin: 0 auto;">
+                <svg class="ic-icon-svg ic-icon-svg--dashboard" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="${COLOR_INACTIVE_ICON}" style="display: block; margin: 0 auto;">
                     <path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h560q33 0 56.5 23.5T800-760v80h80v80h-80v80h80v80h-80v80h80v80h-80v80q0 33-23.5 56.5T720-120H160Zm0-80h560v-560H160v560Zm80-80h200v-160H240v160Zm240-280h160v-120H480v120Zm-240 80h200v-200H240v200Zm240 200h160v-240H480v240ZM160-760v560-560Z"/>
                 </svg>
             </div>
@@ -151,32 +133,35 @@ function initExtension(globalNav) {
         globalNav.appendChild(navItem);
     }
 
-    // --- SMART NAVIGATION GUARD ---
     globalNav.addEventListener('click', (e) => {
         if (navItem.contains(e.target)) return;
-
         const link = e.target.closest('a');
         if (!link) return;
 
         if (link.pathname === window.location.pathname) {
             e.preventDefault(); 
             e.stopPropagation();
-            setMenuIconActive(false);
             const tray = document.getElementById('ubc-clubs-tray');
-            if(tray) tray.classList.remove('tray-open');
+            if(tray) {
+                tray.classList.remove('tray-open');
+                tray.classList.remove('tray-full-width'); // Reset width on close
+            }
+            setMenuIconActive(false);
+            document.title = originalPageTitle;
         } else {
             handleExternalNavClick();
         }
     }, true); 
 }
 
-// --- HANDLER FOR REAL NAVIGATIONS ---
 function handleExternalNavClick() {
     const tray = document.getElementById('ubc-clubs-tray');
     if (tray) {
         tray.classList.remove('tray-open');
+        tray.classList.remove('tray-full-width');
     }
     
+    // Reset Icon Manually
     const navItem = document.getElementById('ubc-clubs-nav-item');
     if(navItem) {
         const iconSvg = navItem.querySelector('svg');
@@ -189,11 +174,10 @@ function handleExternalNavClick() {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
     }
-
+    document.title = originalPageTitle;
     previousState = { element: null, hadClass: false, ariaCurrent: null };
 }
 
-// --- ACTIVE STATE CONTROLLER ---
 function setMenuIconActive(isActive) {
     const navItem = document.getElementById('ubc-clubs-nav-item');
     if (!navItem) return;
@@ -202,26 +186,25 @@ function setMenuIconActive(isActive) {
     const text = navItem.querySelector('.menu-item__text'); 
 
     if (isActive) {
-        // Active Style
+        // ACTIVE: White BG, Navy Icon, Navy Text
         navItem.style.backgroundColor = COLOR_ACTIVE_BG; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON); 
             iconSvg.style.fill = COLOR_ACTIVE_ICON; 
         }
+        // CHANGE: Turn text Navy when active
         if(text) text.style.setProperty('color', COLOR_ACTIVE_ICON, 'important');
 
         // Deactivate Others
         const menuItems = document.querySelectorAll('.ic-app-header__menu-list-item');
         menuItems.forEach(item => {
             if (item === navItem) return; 
-
             if (item.classList.contains('ic-app-header__menu-list-item--active')) {
                 previousState.element = item;
                 previousState.hadClass = true;
                 previousState.ariaCurrent = null; 
                 item.classList.remove('ic-app-header__menu-list-item--active');
             }
-
             const link = item.querySelector('a');
             if (link && link.getAttribute('aria-current') === 'page') {
                 if (!previousState.element || previousState.element === item) {
@@ -231,9 +214,8 @@ function setMenuIconActive(isActive) {
                 link.removeAttribute('aria-current');
             }
         });
-
     } else {
-        // Inactive Style
+        // INACTIVE: Transparent BG, White Icon, White Text
         navItem.style.backgroundColor = ''; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
@@ -241,7 +223,7 @@ function setMenuIconActive(isActive) {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
 
-        // Restore Previous State
+        // Restore Previous
         if (previousState.element) {
             if (previousState.hadClass) {
                 previousState.element.classList.add('ic-app-header__menu-list-item--active');
@@ -259,86 +241,59 @@ async function toggleTray() {
     let tray = document.getElementById('ubc-clubs-tray');
     
     if (tray) {
-        tray.classList.toggle('tray-open');
-        const isOpen = tray.classList.contains('tray-open');
-        setMenuIconActive(isOpen);
+        const isNowOpen = tray.classList.toggle('tray-open');
+        setMenuIconActive(isNowOpen);
+        
+        // If closing, restore title and remove full width
+        if (!isNowOpen) {
+            document.title = originalPageTitle;
+            setTimeout(() => { tray.classList.remove('tray-full-width'); }, 400); // Wait for animation
+        } else {
+            originalPageTitle = document.title;
+            document.title = "Connect";
+        }
         return;
     }
 
     try {
         const url = browserAPI.runtime.getURL('canvas_connect.html');
-        const html = await browserAPI.runtime.getURL('canvas_connect.html')
-        ? await (await fetch(url)).text() 
-        : ""; 
+        const html = await (await fetch(url)).text();
 
         const trayContainer = document.createElement('div');
         trayContainer.id = 'ubc-clubs-tray-container';
         trayContainer.innerHTML = html;
         document.body.appendChild(trayContainer);
 
-        // Check if user is logged in and verify token is still valid
+        document.getElementById('ubc-tray-close').addEventListener('click', () => {
+            const tray = document.getElementById('ubc-clubs-tray');
+            tray.classList.remove('tray-open');
+            setTimeout(() => { tray.classList.remove('tray-full-width'); }, 400);
+            setMenuIconActive(false);
+            document.title = originalPageTitle;
+        });
+
+        // Login Check
         const sessionToken = localStorage.getItem('ubc_session_token');
         if (!sessionToken) {
-            // Show login view only
             const loginView = document.getElementById('view-login');
             const mainContent = document.getElementById('main-content');
-            if (loginView) loginView.style.display = 'block';
-            if (mainContent) mainContent.style.display = 'none';
+            if(loginView) loginView.style.display = 'block';
+            if(mainContent) mainContent.style.display = 'none';
             setupLoginHandler();
         } else {
-            // Verify session token is still valid before showing main content
-            const verification = await verifySessionToken(sessionToken);
-            if (!verification.valid) {
-                // Token is invalid or expired, clear it and show login
-                localStorage.removeItem('ubc_session_token');
-                const loginView = document.getElementById('view-login');
-                const mainContent = document.getElementById('main-content');
-                const errorDiv = document.getElementById('login-error');
-                
-                if (loginView) loginView.style.display = 'block';
-                if (mainContent) mainContent.style.display = 'none';
-                if (errorDiv) {
-                    errorDiv.textContent = 'Your session has expired. Please log in again.';
-                    errorDiv.style.display = 'block';
-                }
-                setupLoginHandler();
+            if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+                showDashboard();
             } else {
-                // Token is valid, show main content
-                const loginView = document.getElementById('view-login');
-                const mainContent = document.getElementById('main-content');
-                
-                if (loginView) loginView.style.display = 'none';
-                if (mainContent) mainContent.style.display = 'block';
-                
-                // Close Handler
-                const closeBtn = document.getElementById('ubc-tray-close');
-                if (closeBtn) {
-                    closeBtn.addEventListener('click', () => {
-                        document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-                        setMenuIconActive(false);
-                    });
-                }
-                
-                // Logout Handler
-                const logoutBtn = document.getElementById('logout-btn');
-                if (logoutBtn) {
-                    logoutBtn.addEventListener('click', handleLogout);
-                }
-
-                // VIEW LOGIC
-                if (localStorage.getItem('ubc_social_onboarded') === 'true') {
-                    showDashboard();
-                } else {
-                    showOnboarding();
-                }
-
-                setupEventHandlers();
+                showOnboarding();
             }
+            setupEventHandlers();
         }
 
         setTimeout(() => {
             document.getElementById('ubc-clubs-tray').classList.add('tray-open');
             setMenuIconActive(true);
+            originalPageTitle = document.title;
+            document.title = "Connect";
         }, 50);
 
     } catch (err) {
@@ -346,80 +301,25 @@ async function toggleTray() {
     }
 }
 
-async function verifySessionToken(sessionToken) {
-    /**
-     * Verify that a stored session token is still valid
-     * Returns: {valid: bool, user: object|null, error: string|null}
-     */
-    try {
-        const response = await safeFetch(`${API_BASE}/auth/verify`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${sessionToken}`
-            }
-        });
-        return { valid: true, user: response.user, error: null };
-    } catch (e) {
-        // Token is invalid or expired
-        return { valid: false, user: null, error: e.message || 'Session expired' };
-    }
-}
-
 function setupLoginHandler() {
     const loginBtn = document.getElementById('login-submit-btn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', handleLogin);
-    }
-    
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
     const tokenInput = document.getElementById('login-token');
-    if (tokenInput) {
-        tokenInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleLogin();
-            }
-        });
-    }
+    if (tokenInput) tokenInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
 }
 
-async function handleLogout() {
-    const sessionToken = localStorage.getItem('ubc_session_token');
-    
-    // Try to invalidate session token on server (don't wait for it to complete)
-    if (sessionToken) {
-        safeFetch(`${API_BASE}/auth/logout`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${sessionToken}`,
-                'Content-Type': 'application/json'
-            }
-        }).catch(err => {
-            console.warn('Logout request failed (non-critical):', err);
-        });
-    }
-    
-    // Clear session token from local storage
+function handleLogout() {
     localStorage.removeItem('ubc_session_token');
-    
-    // Reset tray to original size (remove full-width)
     const tray = document.getElementById('ubc-clubs-tray');
-    if (tray) {
-        tray.classList.remove('tray-full-width');
-    }
-    
-    // Hide main content, show login
+    if (tray) tray.classList.remove('tray-full-width');
     const loginView = document.getElementById('view-login');
     const mainContent = document.getElementById('main-content');
-    const errorDiv = document.getElementById('login-error');
-    
     if (loginView) loginView.style.display = 'block';
     if (mainContent) mainContent.style.display = 'none';
-    if (errorDiv) errorDiv.style.display = 'none';
-    
-    // Clear the token input field
     const tokenInput = document.getElementById('login-token');
     if (tokenInput) tokenInput.value = '';
-    
-    // Setup login handler again
     setupLoginHandler();
 }
 
@@ -427,7 +327,6 @@ async function handleLogin() {
     const tokenInput = document.getElementById('login-token');
     const loginBtn = document.getElementById('login-submit-btn');
     const errorDiv = document.getElementById('login-error');
-    
     const canvasToken = tokenInput.value.trim();
     
     if (!canvasToken) {
@@ -447,61 +346,21 @@ async function handleLogin() {
             body: JSON.stringify({ canvas_token: canvasToken })
         });
         
-        if (!response || !response.session_token) {
-            throw new Error('Invalid response from server. Please try again.');
-        }
-        
-        // Store session token
+        if (!response.session_token) throw new Error('Invalid response');
         localStorage.setItem('ubc_session_token', response.session_token);
         
-        // Hide login, show main content
         document.getElementById('view-login').style.display = 'none';
-        document.getElementById('main-content').style.display = 'block';
+        if(document.getElementById('main-content')) document.getElementById('main-content').style.display = 'block';
         
-        // Setup close handler
-        const closeBtn = document.getElementById('ubc-tray-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-                setMenuIconActive(false);
-            });
-        }
-        
-        // Setup logout handler
-        const logoutBtn = document.getElementById('logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', handleLogout);
-        }
-        
-        // Show onboarding or dashboard
         if (localStorage.getItem('ubc_social_onboarded') === 'true') {
             showDashboard();
         } else {
             showOnboarding();
         }
-        
         setupEventHandlers();
         
     } catch (e) {
-        // Display specific error messages based on the error
-        let errorMessage = 'Login failed. ';
-        
-        if (e.message) {
-            // Use the error message from the server if available
-            if (e.message.includes('Invalid Canvas API token') || e.message.includes('401')) {
-                errorMessage = 'Invalid Canvas API token. Please check that your token is correct and has not expired.';
-            } else if (e.message.includes('Could not connect') || e.message.includes('Connection')) {
-                errorMessage = 'Could not connect to the server. Please check your internet connection and ensure the server is running.';
-            } else if (e.message.includes('Canvas API')) {
-                errorMessage = e.message;
-            } else {
-                errorMessage += e.message;
-            }
-        } else {
-            errorMessage += 'Please check your token and try again.';
-        }
-        
-        errorDiv.textContent = errorMessage;
+        errorDiv.textContent = e.message || 'Login failed.';
         errorDiv.style.display = 'block';
         loginBtn.innerText = 'Login';
         loginBtn.disabled = false;
@@ -536,29 +395,24 @@ function setupEventHandlers() {
 function showOnboarding() {
     const tray = document.getElementById('ubc-clubs-tray');
     tray.classList.remove('tray-full-width'); 
-    
     document.getElementById('view-onboarding').style.display = 'block';
     document.getElementById('view-dashboard').style.display = 'none';
 }
 
 function showDashboard() {
     const tray = document.getElementById('ubc-clubs-tray');
-    tray.classList.add('tray-full-width'); // EXPAND TO FULL WIDTH
-    
+    tray.classList.add('tray-full-width'); 
     document.getElementById('view-onboarding').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'flex';
-    
     loadSchoolFeed();
     loadAllClubs();
     loadGroups();
-    // Call teammate's new function
     loadClasses();
 }
 
 async function handleOnboardingSubmit() {
     const btn = document.getElementById('ai-submit-btn');
     btn.innerText = "Thinking...";
-    
     const year = document.getElementById('ai-year').value;
     const classes = document.getElementById('ai-classes').value.split(',');
     const interests = document.getElementById('ai-interests').value;
@@ -569,16 +423,14 @@ async function handleOnboardingSubmit() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ year, classes, interests })
         });
-        
         renderAIResults(data);
-        
-        btn.innerText = "Enter Social Space ->";
+        btn.innerText = "Enter Social Space";
         btn.onclick = () => {
             localStorage.setItem('ubc_social_onboarded', 'true');
             showDashboard();
         };
-
     } catch (e) {
+        console.error(e);
         alert("Server error. Is Python running?");
         btn.innerText = "Retry";
     }
@@ -592,61 +444,26 @@ function renderAIResults(items) {
     });
 }
 
-// --- LOADERS WITH GRID SUPPORT ---
-
-// New feature from teammate: Load Classes from backend
 async function loadClasses() {
     try {
-        // Get session token from localStorage (set during login)
         const sessionToken = localStorage.getItem('ubc_session_token');
-        if (!sessionToken) {
-            console.warn('No session token found, cannot load classes');
-            const container = document.getElementById('all-classes-list');
-            if (container) {
-                container.innerHTML = '<p class="no-data">Please log in to view classes</p>';
-            }
-            return;
-        }
-
+        if (!sessionToken) return; 
         const classes = await safeFetch(`${API_BASE}/classes`, {
-            headers: {
-                'Authorization': `Bearer ${sessionToken}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }
         });
-
-        console.log("Classes loaded:", classes);
-
         const container = document.getElementById('all-classes-list');
-        // Safety check in case HTML for classes doesn't exist yet
-        if (!container) {
-            console.warn("Classes container not found");
-            return; 
-        }
-
+        if (!container) return;
         container.classList.add('grid-container');
         container.innerHTML = '';
-
         if (!classes || classes.length === 0) {
             container.innerHTML = '<p class="no-data">No classes found</p>';
             return;
         }
-
         classes.forEach(classItem => {
             container.innerHTML += createClassCard(classItem);
         });
     } catch (error) {
         console.error("Error loading classes:", error);
-        console.error("Error details:", {
-            message: error.message,
-            stack: error.stack,
-            error: error
-        });
-        
-        const container = document.getElementById('all-classes-list');
-        if (container) {
-            container.innerHTML = `<p class="no-data" style="color: red;">Error loading classes: ${error.message || error}</p>`;
-        }
     }
 }
 
@@ -658,39 +475,30 @@ function createClassCard(classItem) {
                 <span style="background:#d1e7dd; padding:2px 8px; border-radius:12px; font-size:0.7em;">CLASS</span>
             </div>
             <p style="font-size:0.9em; color:#555;">Course ID: ${classItem.id}</p>
-            <p style="font-size:0.85em; color:#777;">Added: ${new Date(classItem.created_at).toLocaleDateString()}</p>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 <button class="btn-open-chat" onclick="openClassChat(${classItem.id})" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
-                <button class="btn-view-details" onclick="viewClassDetails(${classItem.id})" style="padding:5px 10px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Details</button>
             </div>
         </div>
     `;
 }
 
-// Global functions required for inline onclick events
-window.openClassChat = function(classId) {
-    console.log(`Opening chat for class ${classId}`);
-}
-
-window.viewClassDetails = function(classId) {
-    console.log(`Viewing details for class ${classId}`);
-}
+window.openClassChat = function(classId) { console.log(`Opening chat ${classId}`); }
+window.viewClassDetails = function(classId) { console.log(`Details ${classId}`); }
 
 async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
     if(!container) return;
     container.classList.add('grid-container'); 
-    
-    const items = await safeFetch(API_ALL_ITEMS);
-
-    container.innerHTML = '';
-    items.forEach(item => {
-        container.innerHTML += createCardHTML(item);
-    });
+    try {
+        const items = await safeFetch(API_ALL_ITEMS);
+        container.innerHTML = '';
+        items.forEach(item => {
+            container.innerHTML += createCardHTML(item);
+        });
+    } catch (e) { console.error("Error loading clubs", e); }
 }
 
 function loadSchoolFeed() {
-    // Note: School feed usually isn't a grid, keep it linear or grid as preferred
     safeFetch(API_ALL_ITEMS).then(items => {
         const eventContainer = document.getElementById('feed-events');
         eventContainer.classList.add('grid-container'); 
@@ -704,76 +512,20 @@ function loadSchoolFeed() {
 
 function loadGroups() {
     safeFetch(API_ALL_ITEMS).then(async (items) => {
-        try {
-            const groupContainer = document.getElementById('available-group-chats');
-            groupContainer.classList.add('grid-container'); 
-            const groups = items.filter(i => i.category === 'Group');
-            groupContainer.innerHTML = '';
-            groups.forEach(g => {
-                groupContainer.innerHTML += createCardHTML(g);
-            });
-
-            // Fetch rooms for the user
-            const rooms = await safeFetch(`${API_BASE}/rooms`, {
-                headers: {
-                    'Authorization': `Bearer ${SESSION_TOKEN}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            console.log("Rooms loaded:", rooms);
-
-            // Filter for project and personal rooms (groups)
-            const groupRooms = rooms.filter(r => r.room_type === 'project' || r.room_type === 'personal');
-
-            // Display joined groups
-            const joinedContainer = document.getElementById('my-joined-chats');
-            if (joinedContainer) {
-                if (groupRooms.length === 0) {
-                    joinedContainer.innerHTML = '<p style="color:grey; font-style:italic;">You haven\'t joined any groups yet.</p>';
-                } else {
-                    joinedContainer.innerHTML = '';
-                    groupRooms.forEach(group => {
-                        joinedContainer.innerHTML += createGroupCard(group, true);
-                    });
-                }
-            }
-
-            // Load all available groups
-            const allGroups = await safeFetch(`${API_BASE}/groups`, {
-                headers: {
-                    'Authorization': `Bearer ${SESSION_TOKEN}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            console.log("All groups loaded:", allGroups);
-
-            // Filter out groups the user is already in
-            const joinedIds = new Set(groupRooms.map(g => g.id));
-            const availableGroups = allGroups.filter(g => !joinedIds.has(g.id));
-
-            // Display available groups
-            const availableContainer = document.getElementById('available-group-chats');
-            if (availableContainer) {
-                availableContainer.classList.add('grid-container');
-
-                if (availableGroups.length === 0) {
-                    availableContainer.innerHTML = '<p class="no-data">No available groups</p>';
-                } else {
-                    availableContainer.innerHTML = '';
-                    availableGroups.forEach(group => {
-                        availableContainer.innerHTML += createGroupCard(group, false);
-                    });
-                }
-            }
-        } catch (error) {
-            console.error("Error loading groups:", error);
-        }
+        const groupContainer = document.getElementById('available-group-chats');
+        groupContainer.classList.add('grid-container'); 
+        const groups = items.filter(i => i.category === 'Group');
+        groupContainer.innerHTML = '';
+        groups.forEach(g => {
+            groupContainer.innerHTML += createGroupCard(g, false);
+        });
     });
 }
 
 function createGroupCard(group, isJoined) {
-    const badgeColor = group.room_type === 'personal' ? '#cff4fc' : '#fff3cd';
-    const badgeText = group.room_type === 'personal' ? 'PERSONAL' : 'PROJECT';
+    const badgeColor = '#fff3cd'; 
+    const badgeText = 'GROUP';
+    const uniqueId = `desc-group-${group.id || Math.random().toString(36).substr(2, 9)}`;
 
     return `
         <div class="dashboard-card group-card" data-group-id="${group.id}">
@@ -781,42 +533,58 @@ function createGroupCard(group, isJoined) {
                 <h4 style="margin:0 0 10px 0;">${group.name}</h4>
                 <span style="background:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${badgeText}</span>
             </div>
-            <p style="font-size:0.9em; color:#555;">${group.description || 'No description'}</p>
-            ${group.max_members ? `<p style="font-size:0.85em; color:#777;">Max members: ${group.max_members}</p>` : ''}
+            <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555;">
+                ${group.description || 'No description'}
+            </p>
+            <span onclick="document.getElementById('${uniqueId}').classList.toggle('desc-full')" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline;">Read description</span>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
-                    ? `<button onclick="openGroupChat(${group.id})" style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
-                    : `<button onclick="joinGroup(${group.id})" style="padding:5px 10px; background:#0374B5; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
+                    ? `<button style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
+                    : `<button onclick="joinGroup(${group.id})" style="padding:5px 10px; background:#0055B7; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
                 }
             </div>
         </div>
     `;
 }
 
-window.openGroupChat = function(groupId) {
-    console.log(`Opening chat for group ${groupId}`);
-}
-
-window.joinGroup = function(groupId) {
-    console.log(`Joining group ${groupId}`);
-}
+window.joinGroup = function(id) { alert(`Joining group ${id}`); }
 
 function createCardHTML(item, showScore=false) {
     let tagColor = "#eee";
     if (item.category === "Club") tagColor = "#d1e7dd";
     if (item.category === "Event") tagColor = "#f8d7da";
     if (item.category === "Tech") tagColor = "#cff4fc";
+    const uniqueId = `desc-${Math.floor(Math.random() * 100000)}`;
 
     return `
-        <div class="dashboard-card" style="height: 100%;">
+        <div class="dashboard-card" style="height: 100%; display:flex; flex-direction:column;">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <h4 style="margin:0 0 10px 0;">${item.name}</h4>
-                <span style="background:${tagColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${item.category}</span>
+                <span style="background:${tagColor}; padding:2px 8px; border-radius:10px; font-size:0.7em;">${item.category}</span>
             </div>
-            <p style="font-size:0.9em; color:#555; flex-grow: 1;">${item.description.substring(0, 100)}...</p>
+            <div style="flex-grow: 1;">
+                <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555; margin:0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                    ${item.description}
+                </p>
+                <span onclick="document.getElementById('${uniqueId}').style.display = document.getElementById('${uniqueId}').style.display === 'block' ? '-webkit-box' : 'block'" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline; margin-top:5px; display:inline-block;">Read description</span>
+            </div>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px; font-size:0.85em;">
-                ${showScore ? `<strong style="color:green">${Math.round(item.match_score*100)}% Match</strong>` : `<a href="#">View Details</a>`}
+                ${showScore ? `<strong style="color:green">${Math.round(item.match_score*100)}% Match</strong>` : `<a href="#" style="color:#0055B7;">View Details</a>`}
             </div>
         </div>
     `;
+
+window.openGroupChat = function(groupId) {
+    console.log(`Opening chat for group ${groupId}`);
+    // You can add logic here later to actually switch tabs or open the chat window
+    alert(`Opening chat for group ${groupId}`); 
+};
+
+// Restores the "Details" logger if you need it for debugging
+window.viewClassDetails = function(classId) {
+    console.log(`Viewing details for class ${classId}`);
+};  
+
+
+    
 }
