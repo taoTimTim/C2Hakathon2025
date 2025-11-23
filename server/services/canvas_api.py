@@ -36,7 +36,8 @@ class CanvasAPI:
     def get_user_info(self):
         """
         Get current user information from Canvas
-        Returns: {id: int, name: string, email: string, ...}
+        Returns: {id: int, name: string, email: string, ...} on success
+        Raises: Exception with detailed error message on failure
         """
         try:
             user_data = self._make_request('users/self')
@@ -45,9 +46,25 @@ class CanvasAPI:
                 'name': user_data.get('name', 'Unknown'),
                 'email': user_data.get('email', '')
             }
+        except requests.exceptions.HTTPError as e:
+            # Handle specific HTTP errors
+            if e.response.status_code == 401:
+                raise Exception("Invalid Canvas API token. Please check that your token is correct and has not expired.")
+            elif e.response.status_code == 403:
+                raise Exception("Access forbidden. Your Canvas API token may not have the required permissions.")
+            elif e.response.status_code == 404:
+                raise Exception(f"Canvas API endpoint not found. Please check if Canvas API URL is configured correctly: {self.base_url}")
+            else:
+                raise Exception(f"Canvas API returned error {e.response.status_code}: {e.response.text or str(e)}")
+        except requests.exceptions.ConnectionError as e:
+            raise Exception(f"Could not connect to Canvas API at {self.base_url}. Please check your internet connection and Canvas API URL configuration.")
+        except requests.exceptions.Timeout as e:
+            raise Exception("Connection to Canvas API timed out. Please try again.")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Canvas API request failed: {str(e)}")
         except Exception as e:
-            print(f"Failed to get user info: {str(e)}")
-            return None
+            # Re-raise any other exceptions with context
+            raise Exception(f"Failed to get user info from Canvas: {str(e)}")
 
     def get_user_courses(self):
         """Get all active courses for the current user"""
