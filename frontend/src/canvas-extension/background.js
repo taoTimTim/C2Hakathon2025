@@ -4,9 +4,27 @@ console.log('Background script starting...');
 // Use browser API for Firefox compatibility (Chrome also supports it)
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
+// Keep service worker alive (Chrome MV3 only - prevents termination)
+if (browserAPI.alarms) {
+    // Set up a periodic alarm to keep service worker alive
+    browserAPI.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === 'keepAlive') {
+            console.log('Service worker keep-alive ping');
+        }
+    });
+    
+    // Create alarm that fires every 4 minutes (service workers can be terminated after 5 minutes of inactivity)
+    browserAPI.alarms.create('keepAlive', { periodInMinutes: 4 });
+    console.log('Keep-alive alarm set');
+}
+
 // Handle installation/update
 browserAPI.runtime.onInstalled.addListener((details) => {
     console.log('Extension installed/updated:', details.reason);
+    // Set up keep-alive alarm on install
+    if (browserAPI.alarms) {
+        browserAPI.alarms.create('keepAlive', { periodInMinutes: 4 });
+    }
 });
 
 // Listen for messages from content scripts

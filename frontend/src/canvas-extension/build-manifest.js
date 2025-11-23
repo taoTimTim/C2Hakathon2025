@@ -18,7 +18,8 @@ const chromeManifest = {
   "description": "Adds a Clubs button to the global navigation and fetches recommendations.",
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "alarms"
   ],
   "host_permissions": [
     "http://127.0.0.1:5000/*",
