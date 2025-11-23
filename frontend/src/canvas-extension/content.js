@@ -57,14 +57,45 @@ async function safeFetch(url, options = {}) {
 
 const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
 const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
-const API_BASE = 'http://127.0.0.1:5001/api'; // Using 5001 for Mac compat
+const API_BASE = 'http://localhost:5000/api'; // Main backend on port 5000
 const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
+
+// Expose globally for chat-ui.js
+window.safeFetch = safeFetch;
+window.API_BASE = API_BASE;
 
 // --- COLORS ---
 const COLOR_ACTIVE_BG = '#FFFFFF';      
 const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; 
 const COLOR_INACTIVE_ICON = '#FFFFFF';  
 const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; 
+
+// Global functions for onclick handlers (must be defined early)
+window.openClassChat = function(classId, className, roomType) {
+    console.log(`Opening chat for class ${classId}`);
+    if (typeof openChat === 'function') {
+        openChat(classId, className, roomType);
+    } else {
+        console.error('openChat function not available yet');
+    }
+};
+
+window.viewClassDetails = function(classId) {
+    console.log(`Viewing details for class ${classId}`);
+};
+
+window.openGroupChat = function(groupId, groupName, roomType) {
+    console.log(`Opening chat for group ${groupId}`);
+    if (typeof openChat === 'function') {
+        openChat(groupId, groupName, roomType);
+    } else {
+        console.error('openChat function not available yet');
+    }
+};
+
+window.joinGroup = function(groupId) {
+    console.log(`Joining group ${groupId}`);
+};
 
 // --- STATE TRACKER ---
 let previousState = {
@@ -390,6 +421,45 @@ function setupEventHandlers() {
             if(target) target.style.display = 'block';
         });
     });
+
+    // Event delegation for chat buttons
+    document.addEventListener('click', (e) => {
+        // Handle class chat buttons
+        if (e.target.classList.contains('btn-open-chat')) {
+            const classId = e.target.dataset.classId;
+            const className = e.target.dataset.className;
+            const roomType = e.target.dataset.roomType;
+            if (classId && className && roomType) {
+                window.openClassChat(classId, className, roomType);
+            }
+        }
+
+        // Handle group chat buttons
+        if (e.target.classList.contains('btn-open-group-chat')) {
+            const groupId = e.target.dataset.groupId;
+            const groupName = e.target.dataset.groupName;
+            const roomType = e.target.dataset.roomType;
+            if (groupId && groupName && roomType) {
+                window.openGroupChat(groupId, groupName, roomType);
+            }
+        }
+
+        // Handle join group buttons
+        if (e.target.classList.contains('btn-join-group')) {
+            const groupId = e.target.dataset.groupId;
+            if (groupId) {
+                window.joinGroup(groupId);
+            }
+        }
+
+        // Handle view class details buttons
+        if (e.target.classList.contains('btn-view-details')) {
+            const classId = e.target.dataset.classId;
+            if (classId) {
+                window.viewClassDetails(classId);
+            }
+        }
+    });
 }
 
 function showOnboarding() {
@@ -468,6 +538,7 @@ async function loadClasses() {
 }
 
 function createClassCard(classItem) {
+    const escapedName = classItem.name.replace(/'/g, "\\'");
     return `
         <div class="dashboard-card class-card" data-class-id="${classItem.id}">
             <div style="display:flex; justify-content:space-between; align-items:start;">
@@ -476,7 +547,8 @@ function createClassCard(classItem) {
             </div>
             <p style="font-size:0.9em; color:#555;">Course ID: ${classItem.id}</p>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
-                <button class="btn-open-chat" onclick="openClassChat(${classItem.id})" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
+                <button class="btn-open-chat" data-class-id="${classItem.id}" data-class-name="${escapedName}" data-room-type="class" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
+                <button class="btn-view-details" data-class-id="${classItem.id}" style="padding:5px 10px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Details</button>
             </div>
         </div>
     `;
@@ -509,6 +581,77 @@ function loadSchoolFeed() {
 
 function loadGroups() {
     safeFetch(API_ALL_ITEMS).then(async (items) => {
+        try {
+            const groupContainer = document.getElementById('available-group-chats');
+            groupContainer.classList.add('grid-container');
+            const groups = items.filter(i => i.category === 'Group');
+            groupContainer.innerHTML = '';
+            groups.forEach(g => {
+                groupContainer.innerHTML += createCardHTML(g);
+            });
+
+            // Get session token from localStorage
+            const sessionToken = localStorage.getItem('ubc_session_token');
+            if (!sessionToken) {
+                console.warn('No session token found, cannot load groups');
+                return;
+            }
+
+            // Fetch rooms for the user
+            const rooms = await safeFetch(`${API_BASE}/rooms`, {
+                headers: {
+                    'Authorization': `Bearer ${sessionToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log("Rooms loaded:", rooms);
+
+            // Filter for project and personal rooms (groups)
+            const groupRooms = rooms.filter(r => r.room_type === 'project' || r.room_type === 'personal');
+
+            // Display joined groups
+            const joinedContainer = document.getElementById('my-joined-chats');
+            if (joinedContainer) {
+                if (groupRooms.length === 0) {
+                    joinedContainer.innerHTML = '<p style="color:grey; font-style:italic;">You haven\'t joined any groups yet.</p>';
+                } else {
+                    joinedContainer.innerHTML = '';
+                    groupRooms.forEach(group => {
+                        joinedContainer.innerHTML += createGroupCard(group, true);
+                    });
+                }
+            }
+
+            // Load all available groups
+            const allGroups = await safeFetch(`${API_BASE}/groups`, {
+                headers: {
+                    'Authorization': `Bearer ${sessionToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log("All groups loaded:", allGroups);
+
+            // Filter out groups the user is already in
+            const joinedIds = new Set(groupRooms.map(g => g.id));
+            const availableGroups = allGroups.filter(g => !joinedIds.has(g.id));
+
+            // Display available groups
+            const availableContainer = document.getElementById('available-group-chats');
+            if (availableContainer) {
+                availableContainer.classList.add('grid-container');
+
+                if (availableGroups.length === 0) {
+                    availableContainer.innerHTML = '<p class="no-data">No available groups</p>';
+                } else {
+                    availableContainer.innerHTML = '';
+                    availableGroups.forEach(group => {
+                        availableContainer.innerHTML += createGroupCard(group, false);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error loading groups:", error);
+        }
         const groupContainer = document.getElementById('available-group-chats');
         groupContainer.classList.add('grid-container'); 
         const groups = items.filter(i => i.category === 'Group');
@@ -532,8 +675,10 @@ function loadGroups() {
 }
 
 function createGroupCard(group, isJoined) {
-    const badgeColor = '#fff3cd'; 
-    const badgeText = 'GROUP';
+    const badgeColor = group.room_type === 'personal' ? '#cff4fc' : '#fff3cd';
+    const badgeText = group.room_type === 'personal' ? 'PERSONAL' : 'PROJECT';
+    const escapedName = group.name.replace(/'/g, "\\'");
+    const uniqueId = `desc-group-${group.id || Math.random().toString(36).substr(2, 9)}`;
 
     return `
         <div class="dashboard-card group-card" data-group-id="${group.id}">
@@ -546,8 +691,8 @@ function createGroupCard(group, isJoined) {
             </p>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
-                    ? `<button style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
-                    : `<button data-join-group-id="${group.id}" class="join-group-btn" style="padding:5px 10px; background:#0055B7; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
+                    ? `<button class="btn-open-group-chat" data-group-id="${group.id}" data-group-name="${escapedName}" data-room-type="${group.room_type}" style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
+                    : `<button class="btn-join-group" data-group-id="${group.id}" style="padding:5px 10px; background:#0374B5; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
                 }
             </div>
         </div>
@@ -579,127 +724,3 @@ function createCardHTML(item, showScore=false) {
         </div>
     `;
 }
-
-// --- MISSING HELPERS ADDED BACK ---
-window.openGroupChat = function(groupId) { console.log(`Opening chat for group ${groupId}`); alert(`Opening chat for group ${groupId}`); };
-
-// Define joinGroup function on window object early
-window.joinGroup = async function(groupId) {
-    const sessionToken = localStorage.getItem('ubc_session_token');
-    if (!sessionToken) {
-        showNotification('Please log in first', 'error');
-        return;
-    }
-    
-    // Get group name for notification (from the DOM) - get it before we make the API call
-    const groupCard = document.querySelector(`[data-group-id="${groupId}"]`);
-    let groupName = 'group';
-    if (groupCard) {
-        const nameEl = groupCard.querySelector('h4');
-        if (nameEl) groupName = nameEl.textContent;
-    }
-    
-    try {
-        // The backend will extract user_id from the Authorization header automatically
-        const url = `${API_BASE}/groups/${groupId}/join`;
-        console.log('Joining group:', groupId, 'URL:', url);
-        
-        const response = await safeFetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${sessionToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({}) // Backend will add user_id from the auth token
-        });
-        
-        console.log('Join group response:', response);
-        
-        // Show success notification
-        const name = response.group_name || groupName;
-        showNotification(`You joined the group ${name}`, 'success');
-        
-        // Reload groups to update UI
-        loadGroups();
-    } catch (e) {
-        console.error("Error joining group:", e);
-        console.error("Error details:", {
-            message: e.message,
-            stack: e.stack,
-            name: e.name
-        });
-        showNotification(`Failed to join group: ${e.message || 'Please try again.'}`, 'error');
-    }
-};
-
-// Helper to get current user_id from session token
-async function getCurrentUserId() {
-    const sessionToken = localStorage.getItem('ubc_session_token');
-    if (!sessionToken) return null;
-    
-    try {
-        const response = await safeFetch(`${API_BASE}/auth/verify`, {
-            headers: { 'Authorization': `Bearer ${sessionToken}` }
-        });
-        return response.user_id || response.canvas_user_id;
-    } catch (e) {
-        console.error("Error getting user ID:", e);
-        return null;
-    }
-}
-
-// Show notification at bottom of screen
-function showNotification(message, type = 'success') {
-    // Remove existing notification if any
-    const existing = document.getElementById('ubc-notification');
-    if (existing) existing.remove();
-    
-    const notification = document.createElement('div');
-    notification.id = 'ubc-notification';
-    notification.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: ${type === 'success' ? '#0055B7' : '#d32f2f'};
-        color: white;
-        padding: 12px 24px;
-        border-radius: 6px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10000;
-        font-size: 14px;
-        font-weight: 500;
-        animation: slideUp 0.3s ease-out;
-    `;
-    notification.textContent = message;
-    
-    // Add animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideUp {
-            from {
-                transform: translateX(-50%) translateY(100px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(-50%) translateY(0);
-                opacity: 1;
-            }
-        }
-    `;
-    if (!document.getElementById('ubc-notification-styles')) {
-        style.id = 'ubc-notification-styles';
-        document.head.appendChild(style);
-    }
-    
-    document.body.appendChild(notification);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        notification.style.animation = 'slideUp 0.3s ease-out reverse';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-}
-
-window.openClassChat = function(classId) { console.log(`Opening chat ${classId}`); };
-window.viewClassDetails = function(classId) { console.log(`Details ${classId}`); };

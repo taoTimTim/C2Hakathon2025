@@ -13,14 +13,21 @@ def register_handlers(socketio):
     def handle_connect(auth):
         """
         Handle new socket connection
-        Client must provide: {token: "session_token"}
+        Client must provide: {token: "session_token"} or token in query params
         """
-        if not auth or 'token' not in auth:
+        from flask import request
+
+        # Try to get token from auth dict (Socket.IO client) or query params (native WebSocket)
+        session_token = None
+        if auth and 'token' in auth:
+            session_token = auth['token']
+        elif 'token' in request.args:
+            session_token = request.args.get('token')
+
+        if not session_token:
             print("Connection rejected: No authentication token provided")
             disconnect()
             return False
-
-        session_token = auth['token']
 
         try:
             # Validate session token

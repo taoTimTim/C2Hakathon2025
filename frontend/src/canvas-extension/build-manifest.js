@@ -33,7 +33,7 @@ const chromeManifest = {
   "content_scripts": [
     {
       "matches": ["https://canvas.ubc.ca/*"],
-      "js": ["content.js"],
+      "js": ["chat-client.js", "chat-ui.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
@@ -65,7 +65,7 @@ const firefoxManifest = {
   "content_scripts": [
     {
       "matches": ["https://canvas.ubc.ca/*"],
-      "js": ["content.js"],
+      "js": ["chat-client.js", "chat-ui.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
