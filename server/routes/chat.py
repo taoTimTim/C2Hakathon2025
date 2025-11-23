@@ -82,7 +82,7 @@ def get_groups():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    response, status_code = proxy.forward_request('/groups', method='GET')
+    response, status_code = proxy.forward_request('/groups', method='GET', query_params={'user_id': user_id})
     return jsonify(response), status_code
 
 @bp.route('/clubs', methods=['GET'])
