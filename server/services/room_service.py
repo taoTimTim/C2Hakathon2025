@@ -129,6 +129,34 @@ class RoomService:
             cursor.close()
             conn.close()
 
+    def add_users_to_room_batch(self, user_ids, room_id, role='member'):
+        """
+        Batch add multiple users to a room (for Canvas sync optimization)
+        Skips max_members check as this is for system-generated rooms
+        user_ids: list of user IDs
+        """
+        if not user_ids:
+            return
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Batch insert with ON DUPLICATE KEY to handle existing members
+            values = [(room_id, user_id, role, datetime.utcnow()) for user_id in user_ids]
+
+            cursor.executemany("""
+                INSERT INTO room_members (room_id, user_id, role, joined_at)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE role = VALUES(role)
+            """, values)
+
+            conn.commit()
+
+        finally:
+            cursor.close()
+            conn.close()
+
     def remove_user_from_room(self, user_id, room_id):
         """Remove a user from a room"""
         conn = get_connection()
