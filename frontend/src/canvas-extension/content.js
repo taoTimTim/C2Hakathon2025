@@ -2,8 +2,10 @@
 // ROBUST VERSION - Left Tray & Full Screen Dashboard
 // ===========================================================
 
-const API_RECOMMEND = 'http://127.0.0.1:5000/recommend';
-const API_ALL_ITEMS = 'http://127.0.0.1:5000/items';
+const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
+const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
+const API_BASE = 'http://localhost:5000/api';
+const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
 
 console.log("UBC Social Spaces: Script Loading...");
 
@@ -147,13 +149,14 @@ function showOnboarding() {
 function showDashboard() {
     const tray = document.getElementById('ubc-clubs-tray');
     tray.classList.add('tray-full-width'); // EXPAND TO FULL WIDTH
-    
+
     document.getElementById('view-onboarding').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'flex';
-    
+
     loadSchoolFeed();
     loadAllClubs();
     loadGroups();
+    loadClasses();
 }
 
 // --- DATA LOADERS & AI ---
@@ -197,17 +200,95 @@ function renderAIResults(items) {
 
 // --- LOADERS WITH GRID SUPPORT ---
 
+async function loadClasses() {
+    try {
+        const response = await fetch(`${API_BASE}/classes`, {
+            headers: {
+                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const classes = await response.json();
+        console.log("Classes loaded:", classes);
+
+        const container = document.getElementById('all-classes-list');
+        if (!container) return;
+
+        container.classList.add('grid-container');
+        container.innerHTML = '';
+
+        if (classes.length === 0) {
+            container.innerHTML = '<p class="no-data">No classes found</p>';
+            return;
+        }
+
+        classes.forEach(classItem => {
+            container.innerHTML += createClassCard(classItem);
+        });
+    } catch (error) {
+        console.error("Error loading classes:", error);
+    }
+}
+
+function createClassCard(classItem) {
+    return `
+        <div class="dashboard-card class-card" data-class-id="${classItem.id}">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <h4 style="margin:0 0 10px 0;">${classItem.name}</h4>
+                <span style="background:#d1e7dd; padding:2px 8px; border-radius:12px; font-size:0.7em;">CLASS</span>
+            </div>
+            <p style="font-size:0.9em; color:#555;">Course ID: ${classItem.id}</p>
+            <p style="font-size:0.85em; color:#777;">Added: ${new Date(classItem.created_at).toLocaleDateString()}</p>
+            <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
+                <button class="btn-open-chat" onclick="openClassChat(${classItem.id})" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
+                <button class="btn-view-details" onclick="viewClassDetails(${classItem.id})" style="padding:5px 10px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Details</button>
+            </div>
+        </div>
+    `;
+}
+
+function openClassChat(classId) {
+    console.log(`Opening chat for class ${classId}`);
+}
+
+function viewClassDetails(classId) {
+    console.log(`Viewing details for class ${classId}`);
+}
+
 async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
     if(!container) return;
     container.classList.add('grid-container'); // Add Grid Class
-    
+
     const res = await fetch(API_ALL_ITEMS);
     const items = await res.json();
     container.innerHTML = '';
     items.forEach(item => {
         container.innerHTML += createCardHTML(item);
     });
+
+    // TODO: Replace with real backend API call
+    // try {
+    //     const response = await fetch(`${API_BASE}/clubs`, {
+    //         headers: {
+    //             'Authorization': `Bearer ${SESSION_TOKEN}`,
+    //             'Content-Type': 'application/json'
+    //         }
+    //     });
+    //     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    //     const clubs = await response.json();
+    //     container.innerHTML = '';
+    //     clubs.forEach(club => {
+    //         container.innerHTML += createCardHTML(club);
+    //     });
+    // } catch (error) {
+    //     console.error("Error loading clubs:", error);
+    // }
 }
 
 function loadSchoolFeed() {
