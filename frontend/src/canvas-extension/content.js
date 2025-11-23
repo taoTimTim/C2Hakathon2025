@@ -348,6 +348,12 @@ function handleLogout() {
     // Clear session token
     localStorage.removeItem('ubc_session_token');
     
+    // Reset tray to original size (remove full-width)
+    const tray = document.getElementById('ubc-clubs-tray');
+    if (tray) {
+        tray.classList.remove('tray-full-width');
+    }
+    
     // Hide main content, show login
     const loginView = document.getElementById('view-login');
     const mainContent = document.getElementById('main-content');
