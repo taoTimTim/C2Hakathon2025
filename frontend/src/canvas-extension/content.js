@@ -1,7 +1,8 @@
 // ===========================================================
-// FINAL VERSION - Fixed Text Inversion & Tray Closing
+// FINAL ROBUST VERSION - Fixed Re-Open Geometry & Missing Helpers
 // ===========================================================
 
+// Browser API compatibility
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 // --- KEEP ALIVE LOGIC ---
@@ -11,7 +12,7 @@ function maintainBackgroundConnection() {
     try {
         keepAliveConnection = browserAPI.runtime.connect({ name: 'keepAlive' });
         keepAliveConnection.onDisconnect.addListener(() => {
-            console.log('Background connection lost, reconnecting...');
+            // console.log('Background connection lost, reconnecting...');
             setTimeout(maintainBackgroundConnection, 1000);
         });
         const pingInterval = setInterval(() => {
@@ -24,7 +25,7 @@ function maintainBackgroundConnection() {
                 }
             }
         }, 20000); 
-        console.log('Background connection established');
+        // console.log('Background connection established');
     } catch (error) {
         console.error('Failed to establish background connection:', error);
         setTimeout(maintainBackgroundConnection, 2000);
@@ -39,30 +40,29 @@ async function safeFetch(url, options = {}) {
                 { action: "fetch", url, options },
                 (response) => {
                     if (browserAPI.runtime.lastError) {
-                        console.error('Background script error:', browserAPI.runtime.lastError);
                         return reject(browserAPI.runtime.lastError.message || "Background script error.");
                     }
-                    if (!response) return reject("No response received.");
+                    if (!response) {
+                        return reject("No response received.");
+                    }
                     if (response.error) return reject(response.error);
                     resolve(response.data);
                 }
             );
         } catch (error) {
-            console.error('Error sending message:', error);
             reject(error.message);
         }
     });
 }
 
-// --- CONFIGURATION ---
 const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
 const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://127.0.0.1:5001/api'; // Using 5001 for Mac compat
 const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
 
 // --- COLORS ---
 const COLOR_ACTIVE_BG = '#FFFFFF';      
-const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // UBC Navy
+const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; 
 const COLOR_INACTIVE_ICON = '#FFFFFF';  
 const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; 
 
@@ -72,7 +72,7 @@ let previousState = {
     hadClass: false,
     ariaCurrent: null
 };
-let originalPageTitle = document.title; 
+let originalPageTitle = document.title;
 
 console.log("UBC Social Spaces: Script Loading...");
 
@@ -141,12 +141,12 @@ function initExtension(globalNav) {
         if (link.pathname === window.location.pathname) {
             e.preventDefault(); 
             e.stopPropagation();
+            setMenuIconActive(false);
             const tray = document.getElementById('ubc-clubs-tray');
             if(tray) {
                 tray.classList.remove('tray-open');
-                tray.classList.remove('tray-full-width'); // Reset width on close
+                // Removed classList.remove('tray-full-width') to prevent shrinking bug
             }
-            setMenuIconActive(false);
             document.title = originalPageTitle;
         } else {
             handleExternalNavClick();
@@ -158,10 +158,8 @@ function handleExternalNavClick() {
     const tray = document.getElementById('ubc-clubs-tray');
     if (tray) {
         tray.classList.remove('tray-open');
-        tray.classList.remove('tray-full-width');
     }
     
-    // Reset Icon Manually
     const navItem = document.getElementById('ubc-clubs-nav-item');
     if(navItem) {
         const iconSvg = navItem.querySelector('svg');
@@ -174,6 +172,7 @@ function handleExternalNavClick() {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
     }
+    
     document.title = originalPageTitle;
     previousState = { element: null, hadClass: false, ariaCurrent: null };
 }
@@ -186,16 +185,13 @@ function setMenuIconActive(isActive) {
     const text = navItem.querySelector('.menu-item__text'); 
 
     if (isActive) {
-        // ACTIVE: White BG, Navy Icon, Navy Text
         navItem.style.backgroundColor = COLOR_ACTIVE_BG; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON); 
             iconSvg.style.fill = COLOR_ACTIVE_ICON; 
         }
-        // CHANGE: Turn text Navy when active
         if(text) text.style.setProperty('color', COLOR_ACTIVE_ICON, 'important');
 
-        // Deactivate Others
         const menuItems = document.querySelectorAll('.ic-app-header__menu-list-item');
         menuItems.forEach(item => {
             if (item === navItem) return; 
@@ -215,7 +211,6 @@ function setMenuIconActive(isActive) {
             }
         });
     } else {
-        // INACTIVE: Transparent BG, White Icon, White Text
         navItem.style.backgroundColor = ''; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
@@ -223,7 +218,6 @@ function setMenuIconActive(isActive) {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
 
-        // Restore Previous
         if (previousState.element) {
             if (previousState.hadClass) {
                 previousState.element.classList.add('ic-app-header__menu-list-item--active');
@@ -240,21 +234,25 @@ function setMenuIconActive(isActive) {
 async function toggleTray() {
     let tray = document.getElementById('ubc-clubs-tray');
     
+    // Case 1: Tray already exists
     if (tray) {
         const isNowOpen = tray.classList.toggle('tray-open');
         setMenuIconActive(isNowOpen);
         
-        // If closing, restore title and remove full width
-        if (!isNowOpen) {
-            document.title = originalPageTitle;
-            setTimeout(() => { tray.classList.remove('tray-full-width'); }, 400); // Wait for animation
-        } else {
+        // FIX: Force re-check of width every time we open existing tray
+        if (isNowOpen) {
+            if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+                tray.classList.add('tray-full-width');
+            }
             originalPageTitle = document.title;
             document.title = "Connect";
+        } else {
+            document.title = originalPageTitle;
         }
         return;
     }
 
+    // Case 2: First load
     try {
         const url = browserAPI.runtime.getURL('canvas_connect.html');
         const html = await (await fetch(url)).text();
@@ -265,14 +263,11 @@ async function toggleTray() {
         document.body.appendChild(trayContainer);
 
         document.getElementById('ubc-tray-close').addEventListener('click', () => {
-            const tray = document.getElementById('ubc-clubs-tray');
-            tray.classList.remove('tray-open');
-            setTimeout(() => { tray.classList.remove('tray-full-width'); }, 400);
+            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
             setMenuIconActive(false);
             document.title = originalPageTitle;
         });
 
-        // Login Check
         const sessionToken = localStorage.getItem('ubc_session_token');
         if (!sessionToken) {
             const loginView = document.getElementById('view-login');
@@ -301,13 +296,18 @@ async function toggleTray() {
     }
 }
 
+// ... (Rest of your logic: SetupLogin, Logout, etc.) ...
 function setupLoginHandler() {
     const loginBtn = document.getElementById('login-submit-btn');
-    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleLogin);
+    }
     const tokenInput = document.getElementById('login-token');
-    if (tokenInput) tokenInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLogin();
-    });
+    if (tokenInput) {
+        tokenInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+    }
 }
 
 function handleLogout() {
@@ -424,7 +424,7 @@ async function handleOnboardingSubmit() {
             body: JSON.stringify({ year, classes, interests })
         });
         renderAIResults(data);
-        btn.innerText = "Enter Social Space";
+        btn.innerText = "Enter Social Space ->";
         btn.onclick = () => {
             localStorage.setItem('ubc_social_onboarded', 'true');
             showDashboard();
@@ -481,9 +481,6 @@ function createClassCard(classItem) {
         </div>
     `;
 }
-
-window.openClassChat = function(classId) { console.log(`Opening chat ${classId}`); }
-window.viewClassDetails = function(classId) { console.log(`Details ${classId}`); }
 
 async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
@@ -547,8 +544,6 @@ function createGroupCard(group, isJoined) {
     `;
 }
 
-window.joinGroup = function(id) { alert(`Joining group ${id}`); }
-
 function createCardHTML(item, showScore=false) {
     let tagColor = "#eee";
     if (item.category === "Club") tagColor = "#d1e7dd";
@@ -573,18 +568,10 @@ function createCardHTML(item, showScore=false) {
             </div>
         </div>
     `;
-
-window.openGroupChat = function(groupId) {
-    console.log(`Opening chat for group ${groupId}`);
-    // You can add logic here later to actually switch tabs or open the chat window
-    alert(`Opening chat for group ${groupId}`); 
-};
-
-// Restores the "Details" logger if you need it for debugging
-window.viewClassDetails = function(classId) {
-    console.log(`Viewing details for class ${classId}`);
-};  
-
-
-    
 }
+
+// --- MISSING HELPERS ADDED BACK ---
+window.openGroupChat = function(groupId) { console.log(`Opening chat for group ${groupId}`); alert(`Opening chat for group ${groupId}`); };
+window.joinGroup = function(id) { alert(`Joining group ${id}`); };
+window.openClassChat = function(classId) { console.log(`Opening chat ${classId}`); };
+window.viewClassDetails = function(classId) { console.log(`Details ${classId}`); };
