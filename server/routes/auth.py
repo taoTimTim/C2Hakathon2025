@@ -24,7 +24,7 @@ def login():
         user_info = canvas_api.get_user_info()
 
         if not user_info:
-            return jsonify({"error": "Invalid Canvas API token"}), 401
+            return jsonify({"error": "Invalid Canvas API token. Please check that your token is correct."}), 401
 
         # Create or update user in database
         user_service = UserService()
@@ -50,10 +50,22 @@ def login():
         print(f"KeyError in login: {str(e)}")
         return jsonify({"error": f"Missing required field: {str(e)}"}), 500
     except Exception as e:
-        print(f"Login error: {str(e)}")
+        # The Canvas API now provides detailed error messages
+        error_message = str(e)
+        print(f"Login error: {error_message}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        
+        # Determine appropriate status code based on error message
+        status_code = 500
+        if "Invalid Canvas API token" in error_message or "401" in error_message:
+            status_code = 401
+        elif "Access forbidden" in error_message or "403" in error_message:
+            status_code = 403
+        elif "Could not connect" in error_message or "Connection" in error_message:
+            status_code = 503  # Service Unavailable
+        
+        return jsonify({"error": error_message}), status_code
 
 @bp.route('/logout', methods=['POST'])
 def logout():

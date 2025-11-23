@@ -276,7 +276,7 @@ async function toggleTray() {
         trayContainer.innerHTML = html;
         document.body.appendChild(trayContainer);
 
-        // Check if user is logged in
+        // Check if user is logged in and verify token is still valid
         const sessionToken = localStorage.getItem('ubc_session_token');
         if (!sessionToken) {
             // Show login view only
@@ -286,36 +286,54 @@ async function toggleTray() {
             if (mainContent) mainContent.style.display = 'none';
             setupLoginHandler();
         } else {
-            // User is logged in, show main content
-            const loginView = document.getElementById('view-login');
-            const mainContent = document.getElementById('main-content');
-            
-            if (loginView) loginView.style.display = 'none';
-            if (mainContent) mainContent.style.display = 'block';
-            
-            // Close Handler
-            const closeBtn = document.getElementById('ubc-tray-close');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', () => {
-                    document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-                    menutab.classList.toggle('ic-app-header__menu-list-item--active');
-                });
-            }
-            
-            // Logout Handler
-            const logoutBtn = document.getElementById('logout-btn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', handleLogout);
-            }
-
-            // VIEW LOGIC
-            if (localStorage.getItem('ubc_social_onboarded') === 'true') {
-                showDashboard();
+            // Verify session token is still valid before showing main content
+            const verification = await verifySessionToken(sessionToken);
+            if (!verification.valid) {
+                // Token is invalid or expired, clear it and show login
+                localStorage.removeItem('ubc_session_token');
+                const loginView = document.getElementById('view-login');
+                const mainContent = document.getElementById('main-content');
+                const errorDiv = document.getElementById('login-error');
+                
+                if (loginView) loginView.style.display = 'block';
+                if (mainContent) mainContent.style.display = 'none';
+                if (errorDiv) {
+                    errorDiv.textContent = 'Your session has expired. Please log in again.';
+                    errorDiv.style.display = 'block';
+                }
+                setupLoginHandler();
             } else {
-                showOnboarding();
-            }
+                // Token is valid, show main content
+                const loginView = document.getElementById('view-login');
+                const mainContent = document.getElementById('main-content');
+                
+                if (loginView) loginView.style.display = 'none';
+                if (mainContent) mainContent.style.display = 'block';
+                
+                // Close Handler
+                const closeBtn = document.getElementById('ubc-tray-close');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => {
+                        document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+                        setMenuIconActive(false);
+                    });
+                }
+                
+                // Logout Handler
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', handleLogout);
+                }
 
-            setupEventHandlers();
+                // VIEW LOGIC
+                if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+                    showDashboard();
+                } else {
+                    showOnboarding();
+                }
+
+                setupEventHandlers();
+            }
         }
 
         setTimeout(() => {
@@ -325,6 +343,25 @@ async function toggleTray() {
 
     } catch (err) {
         console.error("ERROR:", err);
+    }
+}
+
+async function verifySessionToken(sessionToken) {
+    /**
+     * Verify that a stored session token is still valid
+     * Returns: {valid: bool, user: object|null, error: string|null}
+     */
+    try {
+        const response = await safeFetch(`${API_BASE}/auth/verify`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`
+            }
+        });
+        return { valid: true, user: response.user, error: null };
+    } catch (e) {
+        // Token is invalid or expired
+        return { valid: false, user: null, error: e.message || 'Session expired' };
     }
 }
 
@@ -344,8 +381,23 @@ function setupLoginHandler() {
     }
 }
 
-function handleLogout() {
-    // Clear session token
+async function handleLogout() {
+    const sessionToken = localStorage.getItem('ubc_session_token');
+    
+    // Try to invalidate session token on server (don't wait for it to complete)
+    if (sessionToken) {
+        safeFetch(`${API_BASE}/auth/logout`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`,
+                'Content-Type': 'application/json'
+            }
+        }).catch(err => {
+            console.warn('Logout request failed (non-critical):', err);
+        });
+    }
+    
+    // Clear session token from local storage
     localStorage.removeItem('ubc_session_token');
     
     // Reset tray to original size (remove full-width)
@@ -357,8 +409,11 @@ function handleLogout() {
     // Hide main content, show login
     const loginView = document.getElementById('view-login');
     const mainContent = document.getElementById('main-content');
+    const errorDiv = document.getElementById('login-error');
+    
     if (loginView) loginView.style.display = 'block';
     if (mainContent) mainContent.style.display = 'none';
+    if (errorDiv) errorDiv.style.display = 'none';
     
     // Clear the token input field
     const tokenInput = document.getElementById('login-token');
@@ -386,14 +441,14 @@ async function handleLogin() {
     errorDiv.style.display = 'none';
     
     try {
-        const response = await safeFetch('http://127.0.0.1:5000/api/auth/login', {
+        const response = await safeFetch(`${API_BASE}/auth/login`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ canvas_token: canvasToken })
         });
         
-        if (!response.session_token) {
-            throw new Error('Invalid response from server');
+        if (!response || !response.session_token) {
+            throw new Error('Invalid response from server. Please try again.');
         }
         
         // Store session token
@@ -404,10 +459,19 @@ async function handleLogin() {
         document.getElementById('main-content').style.display = 'block';
         
         // Setup close handler
-        document.getElementById('ubc-tray-close').addEventListener('click', () => {
-            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-            document.getElementById('ubc-clubs-nav-item').classList.toggle('ic-app-header__menu-list-item--active');
-        });
+        const closeBtn = document.getElementById('ubc-tray-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+                setMenuIconActive(false);
+            });
+        }
+        
+        // Setup logout handler
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', handleLogout);
+        }
         
         // Show onboarding or dashboard
         if (localStorage.getItem('ubc_social_onboarded') === 'true') {
@@ -419,7 +483,25 @@ async function handleLogin() {
         setupEventHandlers();
         
     } catch (e) {
-        errorDiv.textContent = e.message || 'Login failed. Please check your token.';
+        // Display specific error messages based on the error
+        let errorMessage = 'Login failed. ';
+        
+        if (e.message) {
+            // Use the error message from the server if available
+            if (e.message.includes('Invalid Canvas API token') || e.message.includes('401')) {
+                errorMessage = 'Invalid Canvas API token. Please check that your token is correct and has not expired.';
+            } else if (e.message.includes('Could not connect') || e.message.includes('Connection')) {
+                errorMessage = 'Could not connect to the server. Please check your internet connection and ensure the server is running.';
+            } else if (e.message.includes('Canvas API')) {
+                errorMessage = e.message;
+            } else {
+                errorMessage += e.message;
+            }
+        } else {
+            errorMessage += 'Please check your token and try again.';
+        }
+        
+        errorDiv.textContent = errorMessage;
         errorDiv.style.display = 'block';
         loginBtn.innerText = 'Login';
         loginBtn.disabled = false;
