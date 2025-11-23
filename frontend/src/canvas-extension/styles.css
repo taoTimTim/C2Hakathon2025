@@ -1,0 +1,89 @@
+/* --- Global Nav Button Styling --- */
+/* Ensure our icon aligns with Canvas native icons */
+#ubc-clubs-nav-item svg {
+    width: 26px; /* Canvas standard size */
+    height: 26px;
+    margin-bottom: 2px;
+}
+
+/* --- Slide-out Tray Styling --- */
+.ubc-slide-tray {
+    position: fixed;
+    top: 0;
+    left: -400px; /* Hidden off-screen to the left */
+    width: 400px;
+    height: 100vh;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    z-index: 50; /* On top of everything */
+    transition: left 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Class added via JS to slide it in */
+.ubc-slide-tray.tray-open {
+    left: 84px; /* Width of the global nav bar (usually 84px) */
+}
+
+/* Header of the tray */
+.ubc-tray-header {
+    padding: 20px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ubc-tray-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+/* Content Area */
+.ubc-tray-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+/* Cards for clubs/events */
+.club-card {
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background: #fff;
+    transition: transform 0.2s;
+}
+
+.club-card:hover {
+    border-color: #002145; /* UBC Blue */
+    transform: translateY(-2px);
+}
+
+.club-card h4 {
+    margin-top: 0;
+    color: #002145;
+}
+
+.club-card button {
+    background-color: #002145; /* UBC Blue */
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+}
