@@ -59,39 +59,69 @@ class RoomService:
             cursor.close()
             conn.close()
 
-    def create_room(self, name, created_by=None):
+    def create_room(self, name, created_by=None, room_id=None, room_type=None, description=None, max_members=None):
         """
         Create a new room
         created_by: user_id or None for system-generated rooms
+        room_id: specific ID to use (for Canvas sync), or None for auto-increment
+        room_type: 'class', 'club', 'project', 'personal', or None
+        description: optional description (for clubs, projects)
+        max_members: max number of members (10 for personal, None for unlimited)
         Returns: room_id
         """
         conn = get_connection()
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
-                INSERT INTO rooms (name, created_by)
-                VALUES (%s, %s)
-            """, (name, created_by))
-
-            conn.commit()
-            return cursor.lastrowid
+            if room_id:
+                # Insert with specific ID (for Canvas courses/groups)
+                cursor.execute("""
+                    INSERT INTO rooms (id, name, description, room_type, max_members, is_system_generated, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (room_id, name, description, room_type, max_members, True, created_by))
+                conn.commit()
+                return room_id
+            else:
+                # Auto-increment ID
+                cursor.execute("""
+                    INSERT INTO rooms (name, description, room_type, max_members, is_system_generated, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (name, description, room_type, max_members, False, created_by))
+                conn.commit()
+                return cursor.lastrowid
 
         finally:
             cursor.close()
             conn.close()
 
-    def add_user_to_room(self, user_id, room_id):
-        """Add a user to a room"""
+    def add_user_to_room(self, user_id, room_id, role='member'):
+        """
+        Add a user to a room
+        role: 'leader', 'admin', or 'member'
+        Raises ValueError if room is at max capacity
+        """
         conn = get_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
 
         try:
+            # Check if room has max_members limit
+            cursor.execute("SELECT max_members FROM rooms WHERE id = %s", (room_id,))
+            room = cursor.fetchone()
+
+            if room and room['max_members'] is not None:
+                # Count current members
+                cursor.execute("SELECT COUNT(*) as count FROM room_members WHERE room_id = %s", (room_id,))
+                result = cursor.fetchone()
+                current_count = result['count']
+
+                if current_count >= room['max_members']:
+                    raise ValueError(f"Room is at maximum capacity ({room['max_members']} members)")
+
             cursor.execute("""
-                INSERT INTO room_members (room_id, user_id, joined_at)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE joined_at = joined_at
-            """, (room_id, user_id, datetime.utcnow()))
+                INSERT INTO room_members (room_id, user_id, role, joined_at)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE role = VALUES(role), joined_at = joined_at
+            """, (room_id, user_id, role, datetime.utcnow()))
 
             conn.commit()
 

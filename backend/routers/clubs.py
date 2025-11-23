@@ -20,12 +20,13 @@ def get_all_clubs():
     cur = conn.cursor(dictionary=True)
 
     sql = """
-        SELECT c.id, c.name, c.description, c.created_at,
-               COUNT(cm.user_id) as members_count
-        FROM clubs c
-        LEFT JOIN club_members cm ON c.id = cm.club_id
-        GROUP BY c.id, c.name, c.description, c.created_at
-        ORDER BY c.name ASC
+        SELECT r.id, r.name, r.description, r.created_by, r.created_at,
+               COUNT(rm.user_id) as members_count
+        FROM rooms r
+        LEFT JOIN room_members rm ON r.id = rm.room_id
+        WHERE r.room_type = 'club'
+        GROUP BY r.id, r.name, r.description, r.created_by, r.created_at
+        ORDER BY r.name ASC
     """
 
     cur.execute(sql)
@@ -43,11 +44,11 @@ def get_user_clubs(user_id: str):
     cur = conn.cursor(dictionary=True)
 
     sql = """
-        SELECT c.id, c.name, c.description, c.created_at
-        FROM club_members cm
-        JOIN clubs c ON cm.club_id = c.id
-        WHERE cm.user_id = %s
-        ORDER BY c.name ASC
+        SELECT r.id, r.name, r.description, r.created_at, rm.role
+        FROM room_members rm
+        JOIN rooms r ON rm.room_id = r.id
+        WHERE rm.user_id = %s AND r.room_type = 'club'
+        ORDER BY r.name ASC
     """
 
     cur.execute(sql, (user_id,))
@@ -64,43 +65,30 @@ def create_club(club: ClubCreate):
     conn = get_connection()
     cur = conn.cursor()
 
+    # Create club room directly (no separate clubs table)
     sql = """
-        INSERT INTO clubs (name, description, created_by)
-        VALUES (%s, %s, %s)
+        INSERT INTO rooms (name, description, room_type, max_members, is_system_generated, created_by)
+        VALUES (%s, %s, 'club', NULL, FALSE, %s)
     """
 
     cur.execute(sql, (club.name, club.description, club.created_by))
     conn.commit()
-
-    club_id = cur.lastrowid
-
-    # Auto-add creator to club_members as leader
-    sql2 = """
-        INSERT INTO club_members (club_id, user_id, role)
-        VALUES (%s, %s, 'leader')
-    """
-    cur.execute(sql2, (club_id, club.created_by))
-
-    # Create a room for the club (for messaging/channels)
-    sql3 = """
-        INSERT INTO rooms (name, scope_id, room_type, is_system_generated, created_by)
-        VALUES (%s, %s, 'club', FALSE, %s)
-    """
-    cur.execute(sql3, (club.name, str(club_id), club.created_by))
-    conn.commit()
     room_id = cur.lastrowid
 
-    # Add creator to room_members
-    sql4 = "INSERT INTO room_members (room_id, user_id) VALUES (%s, %s)"
-    cur.execute(sql4, (room_id, club.created_by))
-
+    # Auto-add creator to room_members as leader
+    sql2 = """
+        INSERT INTO room_members (room_id, user_id, role)
+        VALUES (%s, %s, 'leader')
+    """
+    cur.execute(sql2, (room_id, club.created_by))
     conn.commit()
+
     cur.close()
     conn.close()
 
     return {
         "status": "success",
-        "club_id": club_id,
+        "club_id": room_id,
         "room_id": room_id
     }
 
@@ -110,32 +98,23 @@ def join_club(club_id: int, body: ClubJoin):
     conn = get_connection()
     cur = conn.cursor()
 
+    # Verify club exists
+    cur.execute("SELECT id FROM rooms WHERE id = %s AND room_type = 'club'", (club_id,))
+    if not cur.fetchone():
+        cur.close()
+        conn.close()
+        raise HTTPException(404, "Club not found")
+
+    # Add user to room_members
     sql = """
-        INSERT INTO club_members (club_id, user_id)
-        VALUES (%s, %s)
+        INSERT INTO room_members (room_id, user_id, role, joined_at)
+        VALUES (%s, %s, 'member', NOW())
+        ON DUPLICATE KEY UPDATE joined_at = NOW()
     """
 
     try:
         cur.execute(sql, (club_id, body.user_id))
         conn.commit()
-        
-        # Also add user to the club's room (for messaging)
-        sql_find_room = """
-            SELECT id FROM rooms
-            WHERE room_type = 'club' AND scope_id = %s
-        """
-        cur.execute(sql_find_room, (str(club_id),))
-        room_result = cur.fetchone()
-        
-        if room_result:
-            room_id = room_result[0]
-            sql_room = """
-                INSERT INTO room_members (room_id, user_id, joined_at)
-                VALUES (%s, %s, NOW())
-                ON DUPLICATE KEY UPDATE joined_at = NOW()
-            """
-            cur.execute(sql_room, (room_id, body.user_id))
-            conn.commit()
     except Exception as e:
         cur.close()
         conn.close()
@@ -156,29 +135,16 @@ def leave_club(club_id: int, user_id: str):
     conn = get_connection()
     cur = conn.cursor()
 
+    # Remove user from room_members
     sql = """
-        DELETE FROM club_members
-        WHERE club_id=%s AND user_id=%s
+        DELETE FROM room_members
+        WHERE room_id = %s AND user_id = %s
     """
 
     cur.execute(sql, (club_id, user_id))
     conn.commit()
 
     removed = cur.rowcount
-
-    # Also remove user from the club's room
-    sql_find_room = """
-        SELECT id FROM rooms
-        WHERE room_type = 'club' AND scope_id = %s
-    """
-    cur.execute(sql_find_room, (str(club_id),))
-    room_result = cur.fetchone()
-    
-    if room_result:
-        room_id = room_result[0]
-        sql_room = "DELETE FROM room_members WHERE room_id = %s AND user_id = %s"
-        cur.execute(sql_room, (room_id, user_id))
-        conn.commit()
 
     cur.close()
     conn.close()
@@ -195,10 +161,10 @@ def get_club_members(club_id: int):
     cur = conn.cursor(dictionary=True)
 
     sql = """
-        SELECT users.canvas_user_id, users.name, club_members.role
-        FROM club_members
-        JOIN users ON club_members.user_id = users.canvas_user_id
-        WHERE club_members.club_id = %s
+        SELECT users.canvas_user_id, users.name, room_members.role
+        FROM room_members
+        JOIN users ON room_members.user_id = users.canvas_user_id
+        WHERE room_members.room_id = %s
         ORDER BY users.name ASC
     """
 
@@ -210,13 +176,13 @@ def get_club_members(club_id: int):
 
     return members
 
-# get clubs a user is in
+# get club by id
 @router.get("/clubs/{club_id}")
 def get_club(club_id: int):
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    sql = "SELECT * FROM clubs WHERE id=%s"
+    sql = "SELECT * FROM rooms WHERE id = %s AND room_type = 'club'"
     cur.execute(sql, (club_id,))
     club = cur.fetchone()
 
@@ -234,28 +200,20 @@ def get_club_messages(club_id: int):
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    # Find the room for this club
-    sql_find_room = """
-        SELECT id FROM rooms
-        WHERE room_type = 'club' AND scope_id = %s
-    """
-    cur.execute(sql_find_room, (str(club_id),))
-    room_result = cur.fetchone()
-
-    if not room_result:
+    # Verify club exists
+    cur.execute("SELECT id FROM rooms WHERE id = %s AND room_type = 'club'", (club_id,))
+    if not cur.fetchone():
         cur.close()
         conn.close()
-        raise HTTPException(404, "Club room not found")
+        raise HTTPException(404, "Club not found")
 
-    room_id = room_result["id"]
-
-    # Get messages from that room
+    # Get messages from the club room
     sql = """
         SELECT * FROM messages
         WHERE room_id = %s
         ORDER BY created_at ASC
     """
-    cur.execute(sql, (room_id,))
+    cur.execute(sql, (club_id,))
     messages = cur.fetchall()
 
     cur.close()
