@@ -6,3 +6,12 @@ We should fill this in when we get the chance
 ```bash
 uvicorn backend.main:app --reload --port 8000
 ```
+
+## To run the other backend (from service)
+'''bash
+flask run
+'''
+
+## To run the other other backend (from backend)
+
+python recommendation_service.py
