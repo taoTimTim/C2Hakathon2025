@@ -311,6 +311,52 @@ Get announcements/posts for a class.
 
 ---
 
+## 📦 Projects (Canvas Groups)
+
+### `GET /groups?user_id={user_id}`
+Get all Canvas groups (projects) a user is a member of.
+
+**Response:**
+```json
+[
+  {
+    "id": 98765,
+    "name": "Team Alpha - Final Project",
+    "room_type": "project",
+    "created_at": "2025-01-15T10:00:00"
+  }
+]
+```
+
+---
+
+### `GET /groups/{group_id}/members`
+Get all members of a project group.
+
+**Response:**
+```json
+[
+  {
+    "canvas_user_id": "832034",
+    "name": "John Doe",
+    "role": "member",
+    "joined_at": "2025-01-15T10:00:00"
+  }
+]
+```
+
+---
+
+### `GET /groups/{group_id}/messages`
+Get messages in a project group chat.
+
+---
+
+### `GET /groups/{group_id}/posts`
+Get announcements/posts for a project group.
+
+---
+
 ## 🎯 Clubs
 
 ### `GET /clubs/all`
@@ -458,88 +504,13 @@ Get announcements/posts for the club.
 
 ---
 
-## 👥 Subgroups (Class Study Groups)
-
-### `POST /classes/{class_id}/subgroups`
-Create a subgroup within a class.
-
-**Request:**
-```json
-{
-  "name": "Study Group A",
-  "class_id": "173488",
-  "created_by": "832034"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "subgroup_id": 125,
-  "name": "Study Group A"
-}
-```
-
----
-
-### `GET /classes/{class_id}/subgroups`
-Get all subgroups for a class.
-
-**Response:**
-```json
-[
-  {
-    "id": 125,
-    "name": "Study Group A",
-    "created_by": "832034",
-    "created_at": "2025-01-22T14:00:00",
-    "members_count": 5
-  }
-]
-```
-
----
-
-### `POST /subgroups/{subgroup_id}/join`
-Join a subgroup.
-
-**Request:**
-```json
-{
-  "user_id": "832034"
-}
-```
-
----
-
-### `DELETE /subgroups/{subgroup_id}/leave?user_id={user_id}`
-Leave a subgroup.
-
----
-
-### `GET /subgroups/{subgroup_id}/members`
-Get subgroup members.
-
----
-
-### `GET /subgroups/{subgroup_id}/messages`
-Get subgroup messages.
-
----
-
-### `GET /subgroups/{subgroup_id}/posts`
-Get subgroup posts.
-
----
-
 ## 🔖 Posts (Announcements)
 
 ### `GET /posts?scope={scope}&scope_id={id}`
 Get posts filtered by scope.
 
 **Query Params:**
-- `scope` - "class", "club", "subgroup", "school"
+- `scope` - "class", "club", "project", "school"
 - `scope_id` - ID of the scope entity
 
 **Response:**
@@ -749,13 +720,12 @@ socket.on('pong', (data) => {
 
 ## 🏗️ Room Type Summary
 
-| Type | Created By | Max Members | Discoverable | Use Case |
-|------|-----------|-------------|--------------|----------|
-| `class` | Canvas sync (auto) | Unlimited | No | Course-wide discussions |
-| `project` | Canvas sync (auto) | Unlimited | No | Canvas group projects |
-| `club` | User (manual) | Unlimited | **Yes** | School-wide organizations |
-| `personal` | User (manual) | **10 max** | No | Private study groups |
-| `subgroup` | User (manual) | Unlimited | No | Class-specific study groups |
+| Type | Created By | Max Members | Discoverable | Posts/Announcements | Use Case |
+|------|-----------|-------------|--------------|---------------------|----------|
+| `class` | Canvas sync (auto) | Unlimited | No | ✅ Yes | Course-wide discussions |
+| `project` | Canvas sync (auto) | Unlimited | No | ✅ Yes | Canvas group projects |
+| `club` | User (manual) | Unlimited | **✅ Yes** | ✅ Yes | School-wide organizations |
+| `personal` | User (manual) | **10 max** | No | ❌ No | Private study groups |
 
 ---
 
@@ -765,7 +735,7 @@ socket.on('pong', (data) => {
 - Members auto-added via Canvas enrollment
 - All members can add/invite others (Canvas handles enrollment)
 
-**User-Created Rooms (club, personal, subgroup):**
+**User-Created Rooms (club, personal):**
 - Only creator can add members
 - Creator has `role='leader'`
 - Other members have `role='member'`

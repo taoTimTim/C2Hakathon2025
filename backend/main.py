@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from .db import init_schema
-from .routers import messages, users, rooms, classes, groups, clubs, posts, subgroups
+from .routers import messages, users, rooms, classes, groups, clubs, posts
 
 app = FastAPI()
 
@@ -12,7 +12,6 @@ app.include_router(classes.router)
 app.include_router(groups.router)
 app.include_router(clubs.router)
 app.include_router(posts.router)
-app.include_router(subgroups.router)
 
 init_schema()
 
