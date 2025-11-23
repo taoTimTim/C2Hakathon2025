@@ -10,8 +10,8 @@
 .ubc-slide-tray {
     position: fixed;
     top: 0;
-    left: -400px; /* Hidden off-screen to the left */
-    width: 400px;
+    left: -60%; /* Hidden off-screen to the left */
+    width: 60%;
     height: 100vh;
     background: white;
     box-shadow: 2px 0 10px rgba(0,0,0,0.1);
