@@ -144,9 +144,7 @@ function initExtension(globalNav) {
     navItem.innerHTML = `
         <a id="global_nav_clubs_link" href="#" class="ic-app-header__menu-list-link" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; background: transparent !important; border: none !important;">
             <div class="menu-item-icon-container" aria-hidden="true" style="position: relative; z-index: 20; display: flex; align-items: center; justify-content: center; background: transparent !important; border: none !important; margin: 0 !important;">
-                <svg class="ic-icon-svg ic-icon-svg--dashboard" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="${COLOR_INACTIVE_ICON}" style="display: block; margin: 0 auto;">
-                    <path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h560q33 0 56.5 23.5T800-760v80h80v80h-80v80h80v80h-80v80h80v80h-80v80q0 33-23.5 56.5T720-120H160Zm0-80h560v-560H160v560Zm80-80h200v-160H240v160Zm240-280h160v-120H480v120Zm-240 80h200v-200H240v200Zm240 200h160v-240H480v240ZM160-760v560-560Z"/>
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 -960 960 960" width="48px" fill="#e3e3e3"><path d="M169.62-140q-23.53 0-40.61-17.08-17.09-17.08-17.09-40.61v-564.62q0-23.53 17.09-40.61Q146.09-820 169.62-820h564.61q23.53 0 40.61 17.08t17.08 40.61v68.47h56.16v45.38h-56.16v145.77h56.16v45.38h-56.16v145.77h56.16v45.38h-56.16v68.47q0 23.53-17.08 40.61T734.23-140H169.62Zm0-45.39h564.61q4.62 0 8.46-3.84 3.85-3.85 3.85-8.46v-564.62q0-4.61-3.85-8.46-3.84-3.84-8.46-3.84H169.62q-4.62 0-8.47 3.84-3.84 3.85-3.84 8.46v564.62q0 4.61 3.84 8.46 3.85 3.84 8.47 3.84Zm68.46-80.77h219.53v-169.99H238.08v169.99ZM498-575.62h167.77v-118.22H498v118.22Zm-259.92 99.08h219.53v-217.3H238.08v217.3ZM498-266.16h167.77v-269.07H498v269.07ZM157.31-774.61v589.22-589.22Z"/></svg>
             </div>
             <div class="menu-item__text" style="position: relative; z-index: 20; color: ${COLOR_TEXT_ALWAYS_WHITE} !important;">Connect</div>
         </a>
