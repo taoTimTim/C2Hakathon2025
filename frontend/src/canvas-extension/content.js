@@ -1,25 +1,19 @@
 // ===========================================================
-// ROBUST VERSION - Logic & UI Merged (Read More + UI Fixes + Title Logic)
+// FINAL VERSION - Fixed Text Inversion & Tray Closing
 // ===========================================================
 
-// Browser API compatibility (works for both Chrome and Firefox)
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
-// Keep background service worker alive with persistent connection
+// --- KEEP ALIVE LOGIC ---
 let keepAliveConnection = null;
 
 function maintainBackgroundConnection() {
     try {
-        // Create persistent connection to keep service worker alive
         keepAliveConnection = browserAPI.runtime.connect({ name: 'keepAlive' });
-        
         keepAliveConnection.onDisconnect.addListener(() => {
-            // Reconnect if connection is lost
             console.log('Background connection lost, reconnecting...');
             setTimeout(maintainBackgroundConnection, 1000);
         });
-        
-        // Send periodic pings to keep connection alive
         const pingInterval = setInterval(() => {
             if (keepAliveConnection) {
                 try {
@@ -29,56 +23,48 @@ function maintainBackgroundConnection() {
                     maintainBackgroundConnection();
                 }
             }
-        }, 20000); // Ping every 20 seconds
-        
+        }, 20000); 
         console.log('Background connection established');
     } catch (error) {
         console.error('Failed to establish background connection:', error);
-        // Retry after a delay
         setTimeout(maintainBackgroundConnection, 2000);
     }
 }
-
-// Establish connection when content script loads
 maintainBackgroundConnection();
 
 async function safeFetch(url, options = {}) {
     return new Promise((resolve, reject) => {
-        // Ensure background script is ready
         try {
             browserAPI.runtime.sendMessage(
                 { action: "fetch", url, options },
                 (response) => {
-                    // Check for runtime errors (e.g., background script not responding)
                     if (browserAPI.runtime.lastError) {
                         console.error('Background script error:', browserAPI.runtime.lastError);
-                        return reject(browserAPI.runtime.lastError.message || "Background script error. Please reload the extension.");
+                        return reject(browserAPI.runtime.lastError.message || "Background script error.");
                     }
-                    if (!response) {
-                        console.error('No response from background script');
-                        return reject("No response received. Please reload the extension.");
-                    }
+                    if (!response) return reject("No response received.");
                     if (response.error) return reject(response.error);
                     resolve(response.data);
                 }
             );
         } catch (error) {
-            console.error('Error sending message to background:', error);
-            reject(error.message || "Failed to communicate with background script");
+            console.error('Error sending message:', error);
+            reject(error.message);
         }
     });
 }
 
+// --- CONFIGURATION ---
 const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
 const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
 const API_BASE = 'http://localhost:5000/api';
 const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
 
-// --- COLORS (UI FIXES) ---
-const COLOR_ACTIVE_BG = '#FFFFFF';      // White background when open
-const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // Exact UBC Blue RGB
-const COLOR_INACTIVE_ICON = '#FFFFFF';  // White icon when closed
-const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; // Ensures tooltip text stays white
+// --- COLORS ---
+const COLOR_ACTIVE_BG = '#FFFFFF';      
+const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // UBC Navy
+const COLOR_INACTIVE_ICON = '#FFFFFF';  
+const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; 
 
 // --- STATE TRACKER ---
 let previousState = {
@@ -86,7 +72,7 @@ let previousState = {
     hadClass: false,
     ariaCurrent: null
 };
-let originalPageTitle = document.title; // Store the original page title
+let originalPageTitle = document.title; 
 
 console.log("UBC Social Spaces: Script Loading...");
 
@@ -102,7 +88,6 @@ function startObserver() {
         initExtension(menu);
         return;
     }
-
     const observer = new MutationObserver((mutations, obs) => {
         const menu = document.getElementById('menu');
         if (menu) {
@@ -110,7 +95,6 @@ function startObserver() {
             obs.disconnect();
         }
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
@@ -121,7 +105,6 @@ function initExtension(globalNav) {
     navItem.id = 'ubc-clubs-nav-item';
     navItem.className = 'ic-app-header__menu-list-item'; 
     
-    // FORCE FULL WIDTH/HEIGHT for the white background effect
     navItem.style.position = 'relative';
     navItem.style.width = '100%'; 
     navItem.style.margin = '0'; 
@@ -150,21 +133,20 @@ function initExtension(globalNav) {
         globalNav.appendChild(navItem);
     }
 
-    // --- SMART NAVIGATION GUARD ---
     globalNav.addEventListener('click', (e) => {
         if (navItem.contains(e.target)) return;
-
         const link = e.target.closest('a');
         if (!link) return;
 
         if (link.pathname === window.location.pathname) {
             e.preventDefault(); 
             e.stopPropagation();
-            setMenuIconActive(false);
             const tray = document.getElementById('ubc-clubs-tray');
-            if(tray) tray.classList.remove('tray-open');
-            
-            // Restore Title on Self-Click Close
+            if(tray) {
+                tray.classList.remove('tray-open');
+                tray.classList.remove('tray-full-width'); // Reset width on close
+            }
+            setMenuIconActive(false);
             document.title = originalPageTitle;
         } else {
             handleExternalNavClick();
@@ -172,13 +154,14 @@ function initExtension(globalNav) {
     }, true); 
 }
 
-// --- HANDLER FOR REAL NAVIGATIONS ---
 function handleExternalNavClick() {
     const tray = document.getElementById('ubc-clubs-tray');
     if (tray) {
         tray.classList.remove('tray-open');
+        tray.classList.remove('tray-full-width');
     }
     
+    // Reset Icon Manually
     const navItem = document.getElementById('ubc-clubs-nav-item');
     if(navItem) {
         const iconSvg = navItem.querySelector('svg');
@@ -191,14 +174,10 @@ function handleExternalNavClick() {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
     }
-
-    // Restore Title
     document.title = originalPageTitle;
-    
     previousState = { element: null, hadClass: false, ariaCurrent: null };
 }
 
-// --- ACTIVE STATE CONTROLLER ---
 function setMenuIconActive(isActive) {
     const navItem = document.getElementById('ubc-clubs-nav-item');
     if (!navItem) return;
@@ -207,26 +186,25 @@ function setMenuIconActive(isActive) {
     const text = navItem.querySelector('.menu-item__text'); 
 
     if (isActive) {
-        // Active Style
+        // ACTIVE: White BG, Navy Icon, Navy Text
         navItem.style.backgroundColor = COLOR_ACTIVE_BG; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON); 
             iconSvg.style.fill = COLOR_ACTIVE_ICON; 
         }
-        if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important'); // Keep White
+        // CHANGE: Turn text Navy when active
+        if(text) text.style.setProperty('color', COLOR_ACTIVE_ICON, 'important');
 
         // Deactivate Others
         const menuItems = document.querySelectorAll('.ic-app-header__menu-list-item');
         menuItems.forEach(item => {
             if (item === navItem) return; 
-
             if (item.classList.contains('ic-app-header__menu-list-item--active')) {
                 previousState.element = item;
                 previousState.hadClass = true;
                 previousState.ariaCurrent = null; 
                 item.classList.remove('ic-app-header__menu-list-item--active');
             }
-
             const link = item.querySelector('a');
             if (link && link.getAttribute('aria-current') === 'page') {
                 if (!previousState.element || previousState.element === item) {
@@ -236,9 +214,8 @@ function setMenuIconActive(isActive) {
                 link.removeAttribute('aria-current');
             }
         });
-
     } else {
-        // Inactive Style
+        // INACTIVE: Transparent BG, White Icon, White Text
         navItem.style.backgroundColor = ''; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
@@ -246,7 +223,7 @@ function setMenuIconActive(isActive) {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
 
-        // Restore Previous State
+        // Restore Previous
         if (previousState.element) {
             if (previousState.hadClass) {
                 previousState.element.classList.add('ic-app-header__menu-list-item--active');
@@ -264,25 +241,23 @@ async function toggleTray() {
     let tray = document.getElementById('ubc-clubs-tray');
     
     if (tray) {
-        tray.classList.toggle('tray-open');
-        const isOpen = tray.classList.contains('tray-open');
-        setMenuIconActive(isOpen);
+        const isNowOpen = tray.classList.toggle('tray-open');
+        setMenuIconActive(isNowOpen);
         
-        // Toggle Title
-        if (isOpen) {
-            originalPageTitle = document.title; // Capture current title before changing
-            document.title = "Connect";
-        } else {
+        // If closing, restore title and remove full width
+        if (!isNowOpen) {
             document.title = originalPageTitle;
+            setTimeout(() => { tray.classList.remove('tray-full-width'); }, 400); // Wait for animation
+        } else {
+            originalPageTitle = document.title;
+            document.title = "Connect";
         }
         return;
     }
 
     try {
         const url = browserAPI.runtime.getURL('canvas_connect.html');
-        const html = await browserAPI.runtime.getURL('canvas_connect.html')
-        ? await (await fetch(url)).text() 
-        : ""; 
+        const html = await (await fetch(url)).text();
 
         const trayContainer = document.createElement('div');
         trayContainer.id = 'ubc-clubs-tray-container';
@@ -290,21 +265,22 @@ async function toggleTray() {
         document.body.appendChild(trayContainer);
 
         document.getElementById('ubc-tray-close').addEventListener('click', () => {
-            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+            const tray = document.getElementById('ubc-clubs-tray');
+            tray.classList.remove('tray-open');
+            setTimeout(() => { tray.classList.remove('tray-full-width'); }, 400);
             setMenuIconActive(false);
-            document.title = originalPageTitle; // Restore title on close
+            document.title = originalPageTitle;
         });
 
-        // Check login (Keep Teammate Logic)
+        // Login Check
         const sessionToken = localStorage.getItem('ubc_session_token');
         if (!sessionToken) {
             const loginView = document.getElementById('view-login');
             const mainContent = document.getElementById('main-content');
-            if (loginView) loginView.style.display = 'block';
-            if (mainContent) mainContent.style.display = 'none';
+            if(loginView) loginView.style.display = 'block';
+            if(mainContent) mainContent.style.display = 'none';
             setupLoginHandler();
         } else {
-            // Check onboarding logic
             if (localStorage.getItem('ubc_social_onboarded') === 'true') {
                 showDashboard();
             } else {
@@ -316,8 +292,6 @@ async function toggleTray() {
         setTimeout(() => {
             document.getElementById('ubc-clubs-tray').classList.add('tray-open');
             setMenuIconActive(true);
-            
-            // Set Title on First Open
             originalPageTitle = document.title;
             document.title = "Connect";
         }, 50);
@@ -327,18 +301,13 @@ async function toggleTray() {
     }
 }
 
-// ... (Keep setupLoginHandler, handleLogout, handleLogin from your file) ...
 function setupLoginHandler() {
     const loginBtn = document.getElementById('login-submit-btn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', handleLogin);
-    }
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
     const tokenInput = document.getElementById('login-token');
-    if (tokenInput) {
-        tokenInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleLogin();
-        });
-    }
+    if (tokenInput) tokenInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
 }
 
 function handleLogout() {
@@ -381,7 +350,6 @@ async function handleLogin() {
         localStorage.setItem('ubc_session_token', response.session_token);
         
         document.getElementById('view-login').style.display = 'none';
-        // If main-content wrapper exists, show it, otherwise relying on dashboard view logic
         if(document.getElementById('main-content')) document.getElementById('main-content').style.display = 'block';
         
         if (localStorage.getItem('ubc_social_onboarded') === 'true') {
@@ -427,7 +395,6 @@ function setupEventHandlers() {
 function showOnboarding() {
     const tray = document.getElementById('ubc-clubs-tray');
     tray.classList.remove('tray-full-width'); 
-    
     document.getElementById('view-onboarding').style.display = 'block';
     document.getElementById('view-dashboard').style.display = 'none';
 }
@@ -435,10 +402,8 @@ function showOnboarding() {
 function showDashboard() {
     const tray = document.getElementById('ubc-clubs-tray');
     tray.classList.add('tray-full-width'); 
-    
     document.getElementById('view-onboarding').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'flex';
-    
     loadSchoolFeed();
     loadAllClubs();
     loadGroups();
@@ -448,7 +413,6 @@ function showDashboard() {
 async function handleOnboardingSubmit() {
     const btn = document.getElementById('ai-submit-btn');
     btn.innerText = "Thinking...";
-    
     const year = document.getElementById('ai-year').value;
     const classes = document.getElementById('ai-classes').value.split(',');
     const interests = document.getElementById('ai-interests').value;
@@ -459,16 +423,14 @@ async function handleOnboardingSubmit() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ year, classes, interests })
         });
-        
         renderAIResults(data);
-        
         btn.innerText = "Enter Social Space ->";
         btn.onclick = () => {
             localStorage.setItem('ubc_social_onboarded', 'true');
             showDashboard();
         };
-
     } catch (e) {
+        console.error(e);
         alert("Server error. Is Python running?");
         btn.innerText = "Retry";
     }
@@ -482,31 +444,21 @@ function renderAIResults(items) {
     });
 }
 
-// --- LOADERS ---
-
 async function loadClasses() {
     try {
         const sessionToken = localStorage.getItem('ubc_session_token');
-        if (!sessionToken) return; // Or show login message
-
+        if (!sessionToken) return; 
         const classes = await safeFetch(`${API_BASE}/classes`, {
-            headers: {
-                'Authorization': `Bearer ${sessionToken}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }
         });
-
         const container = document.getElementById('all-classes-list');
         if (!container) return;
-
         container.classList.add('grid-container');
         container.innerHTML = '';
-
         if (!classes || classes.length === 0) {
             container.innerHTML = '<p class="no-data">No classes found</p>';
             return;
         }
-
         classes.forEach(classItem => {
             container.innerHTML += createClassCard(classItem);
         });
@@ -537,12 +489,13 @@ async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
     if(!container) return;
     container.classList.add('grid-container'); 
-    
-    const items = await safeFetch(API_ALL_ITEMS);
-    container.innerHTML = '';
-    items.forEach(item => {
-        container.innerHTML += createCardHTML(item);
-    });
+    try {
+        const items = await safeFetch(API_ALL_ITEMS);
+        container.innerHTML = '';
+        items.forEach(item => {
+            container.innerHTML += createCardHTML(item);
+        });
+    } catch (e) { console.error("Error loading clubs", e); }
 }
 
 function loadSchoolFeed() {
@@ -564,14 +517,13 @@ function loadGroups() {
         const groups = items.filter(i => i.category === 'Group');
         groupContainer.innerHTML = '';
         groups.forEach(g => {
-            groupContainer.innerHTML += createGroupCard(g, false); // Use new card logic
+            groupContainer.innerHTML += createGroupCard(g, false);
         });
     });
 }
 
-// --- NEW: Group Card with Read More ---
 function createGroupCard(group, isJoined) {
-    const badgeColor = '#fff3cd'; // Default
+    const badgeColor = '#fff3cd'; 
     const badgeText = 'GROUP';
     const uniqueId = `desc-group-${group.id || Math.random().toString(36).substr(2, 9)}`;
 
@@ -581,13 +533,10 @@ function createGroupCard(group, isJoined) {
                 <h4 style="margin:0 0 10px 0;">${group.name}</h4>
                 <span style="background:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${badgeText}</span>
             </div>
-            
-            <!-- READ MORE LOGIC -->
             <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555;">
                 ${group.description || 'No description'}
             </p>
             <span onclick="document.getElementById('${uniqueId}').classList.toggle('desc-full')" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline;">Read description</span>
-
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
                     ? `<button style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
@@ -600,13 +549,11 @@ function createGroupCard(group, isJoined) {
 
 window.joinGroup = function(id) { alert(`Joining group ${id}`); }
 
-// --- NEW: Item Card with Read More ---
 function createCardHTML(item, showScore=false) {
     let tagColor = "#eee";
     if (item.category === "Club") tagColor = "#d1e7dd";
     if (item.category === "Event") tagColor = "#f8d7da";
     if (item.category === "Tech") tagColor = "#cff4fc";
-
     const uniqueId = `desc-${Math.floor(Math.random() * 100000)}`;
 
     return `
@@ -615,14 +562,12 @@ function createCardHTML(item, showScore=false) {
                 <h4 style="margin:0 0 10px 0;">${item.name}</h4>
                 <span style="background:${tagColor}; padding:2px 8px; border-radius:10px; font-size:0.7em;">${item.category}</span>
             </div>
-            
             <div style="flex-grow: 1;">
                 <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555; margin:0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
                     ${item.description}
                 </p>
                 <span onclick="document.getElementById('${uniqueId}').style.display = document.getElementById('${uniqueId}').style.display === 'block' ? '-webkit-box' : 'block'" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline; margin-top:5px; display:inline-block;">Read description</span>
             </div>
-
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px; font-size:0.85em;">
                 ${showScore ? `<strong style="color:green">${Math.round(item.match_score*100)}% Match</strong>` : `<a href="#" style="color:#0055B7;">View Details</a>`}
             </div>
