@@ -4,8 +4,11 @@
 
 const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
 const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
+// Incoming features from teammate
+const API_BASE = 'http://localhost:5000/api';
+const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
 
-// COLORS
+// COLORS (Your UI Fixes)
 const COLOR_ACTIVE_BG = '#FFFFFF';      // White background when open
 const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // Exact UBC Blue RGB
 const COLOR_INACTIVE_ICON = '#FFFFFF';  // White icon when closed
@@ -51,6 +54,7 @@ function initExtension(globalNav) {
     navItem.id = 'ubc-clubs-nav-item';
     navItem.className = 'ic-app-header__menu-list-item'; 
     
+    // FORCE FULL WIDTH/HEIGHT for the white background effect
     navItem.style.position = 'relative';
     navItem.style.width = '100%'; 
     navItem.style.margin = '0'; 
@@ -81,30 +85,18 @@ function initExtension(globalNav) {
 
     // --- SMART NAVIGATION GUARD ---
     globalNav.addEventListener('click', (e) => {
-        // 1. Ignore clicks on our own button (handled above)
         if (navItem.contains(e.target)) return;
 
-        // 2. Find the clicked link
         const link = e.target.closest('a');
         if (!link) return;
 
-        // 3. CHECK: Is this link pointing to the current page?
-        // If yes, we BLOCK the reload and just close our tray.
-        // If no, we let the reload happen.
         if (link.pathname === window.location.pathname) {
-            e.preventDefault(); // Stop the refresh
+            e.preventDefault(); 
             e.stopPropagation();
-            
-            // Close tray and Restore previous active icon
             setMenuIconActive(false);
-            
-            // Explicitly close tray logic in case helper didn't catch it
             const tray = document.getElementById('ubc-clubs-tray');
             if(tray) tray.classList.remove('tray-open');
-            
         } else {
-            // It's a real navigation (e.g. Dashboard -> Calendar)
-            // We want to wipe the state so when we return, we don't accidentally highlight the wrong thing.
             handleExternalNavClick();
         }
     }, true); 
@@ -130,7 +122,6 @@ function handleExternalNavClick() {
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
     }
 
-    // NUCLEAR OPTION: User is leaving the page, so forget everything.
     previousState = { element: null, hadClass: false, ariaCurrent: null };
 }
 
@@ -143,7 +134,7 @@ function setMenuIconActive(isActive) {
     const text = navItem.querySelector('.menu-item__text'); 
 
     if (isActive) {
-        // 1. STYLE OUR BUTTON (Active)
+        // Active Style
         navItem.style.backgroundColor = COLOR_ACTIVE_BG; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON); 
@@ -151,7 +142,7 @@ function setMenuIconActive(isActive) {
         }
         if(text) text.style.setProperty('color', COLOR_ACTIVE_ICON, 'important');
 
-        // 2. DEACTIVATE OTHERS
+        // Deactivate Others
         const menuItems = document.querySelectorAll('.ic-app-header__menu-list-item');
         menuItems.forEach(item => {
             if (item === navItem) return; 
@@ -174,7 +165,7 @@ function setMenuIconActive(isActive) {
         });
 
     } else {
-        // 1. STYLE OUR BUTTON (Inactive)
+        // Inactive Style
         navItem.style.backgroundColor = ''; 
         if(iconSvg) {
             iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
@@ -182,7 +173,7 @@ function setMenuIconActive(isActive) {
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
 
-        // 2. RESTORE PREVIOUS STATE
+        // Restore Previous State
         if (previousState.element) {
             if (previousState.hadClass) {
                 previousState.element.classList.add('ic-app-header__menu-list-item--active');
@@ -274,7 +265,7 @@ function showOnboarding() {
 
 function showDashboard() {
     const tray = document.getElementById('ubc-clubs-tray');
-    tray.classList.add('tray-full-width'); 
+    tray.classList.add('tray-full-width'); // EXPAND TO FULL WIDTH
     
     document.getElementById('view-onboarding').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'flex';
@@ -282,6 +273,8 @@ function showDashboard() {
     loadSchoolFeed();
     loadAllClubs();
     loadGroups();
+    // Call teammate's new function
+    loadClasses();
 }
 
 async function handleOnboardingSubmit() {
@@ -319,6 +312,71 @@ function renderAIResults(items) {
     items.forEach(item => {
         area.innerHTML += createCardHTML(item, true);
     });
+}
+
+// --- LOADERS WITH GRID SUPPORT ---
+
+// New feature from teammate: Load Classes from backend
+async function loadClasses() {
+    try {
+        const response = await fetch(`${API_BASE}/classes`, {
+            headers: {
+                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const classes = await response.json();
+        console.log("Classes loaded:", classes);
+
+        const container = document.getElementById('all-classes-list');
+        // Safety check in case HTML for classes doesn't exist yet
+        if (!container) return; 
+
+        container.classList.add('grid-container');
+        container.innerHTML = '';
+
+        if (classes.length === 0) {
+            container.innerHTML = '<p class="no-data">No classes found</p>';
+            return;
+        }
+
+        classes.forEach(classItem => {
+            container.innerHTML += createClassCard(classItem);
+        });
+    } catch (error) {
+        console.error("Error loading classes:", error);
+    }
+}
+
+function createClassCard(classItem) {
+    return `
+        <div class="dashboard-card class-card" data-class-id="${classItem.id}">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <h4 style="margin:0 0 10px 0;">${classItem.name}</h4>
+                <span style="background:#d1e7dd; padding:2px 8px; border-radius:12px; font-size:0.7em;">CLASS</span>
+            </div>
+            <p style="font-size:0.9em; color:#555;">Course ID: ${classItem.id}</p>
+            <p style="font-size:0.85em; color:#777;">Added: ${new Date(classItem.created_at).toLocaleDateString()}</p>
+            <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
+                <button class="btn-open-chat" onclick="openClassChat(${classItem.id})" style="margin-right:5px; padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>
+                <button class="btn-view-details" onclick="viewClassDetails(${classItem.id})" style="padding:5px 10px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Details</button>
+            </div>
+        </div>
+    `;
+}
+
+// Global functions required for inline onclick events
+window.openClassChat = function(classId) {
+    console.log(`Opening chat for class ${classId}`);
+}
+
+window.viewClassDetails = function(classId) {
+    console.log(`Viewing details for class ${classId}`);
 }
 
 async function loadAllClubs() {
