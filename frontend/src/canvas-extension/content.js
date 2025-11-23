@@ -1,29 +1,23 @@
 // ===========================================================
-// Canvas Social Spaces Extension - Integrated AI Backend
+// Canvas Social Spaces Extension - Full Dashboard Logic
 // ===========================================================
 
-// 1. Point to your local Python AI Service
-const API_ENDPOINT = 'http://127.0.0.1:5000/recommend'; 
+const API_RECOMMEND = 'http://127.0.0.1:5000/recommend';
+const API_ALL_ITEMS = 'http://127.0.0.1:5000/items';
 
 console.log("UBC Social Spaces: Extension Loaded.");
 
-// Initialize the extension on load
 initExtension();
 
 function initExtension() {
-    // 1. Find the Global Navigation Menu
     const globalNav = document.getElementById('menu');
     if (!globalNav) return;
-
-    // 2. Prevent duplicate injection
     if (document.getElementById('ubc-clubs-nav-item')) return;
 
-    // 3. Create the List Item (li) and Link (a)
     const navItem = document.createElement('li');
     navItem.id = 'ubc-clubs-nav-item';
     navItem.className = 'ic-app-header__menu-list-item'; 
 
-    // Create the inner HTML (Using YOUR specific SVG and "Connect" text)
     navItem.innerHTML = `
         <a id="global_nav_clubs_link" href="#" class="ic-app-header__menu-list-link">
             <div class="menu-item-icon-container" aria-hidden="true">
@@ -35,30 +29,26 @@ function initExtension() {
         </a>
     `;
 
-    // 4. Add Click Event
     navItem.addEventListener('click', (e) => {
         e.preventDefault();
         toggleTray();
     });
 
-    // 5. Append to the menu (Using YOUR specific insertBefore logic)
-    // Note: using childNodes[6] might be fragile if Canvas changes layout, but keeping as requested.
     if (globalNav.childNodes.length > 6) {
         globalNav.insertBefore(navItem, globalNav.childNodes[6]);
     } else {
-        globalNav.appendChild(navItem); // Fallback
+        globalNav.appendChild(navItem);
     }
 }
 
 async function toggleTray() {
     let tray = document.getElementById('ubc-clubs-tray');
-    
     if (tray) {
         tray.classList.toggle('tray-open');
         return;
     }
 
-    // --- STEP 1: Load the Tray HTML ---
+    // Load HTML
     const url = chrome.runtime.getURL('canvas_connect.html');
     const response = await fetch(url);
     const html = await response.text();
@@ -68,165 +58,256 @@ async function toggleTray() {
     trayContainer.innerHTML = html;
     document.body.appendChild(trayContainer);
 
-    // Close Button Logic
+    // Close Handler
     document.getElementById('ubc-tray-close').addEventListener('click', () => {
         document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
     });
 
-    // --- STEP 2: Render the Input Form ---
-    // We do NOT fetch data immediately. We wait for user input.
-    renderOnboardingForm();
+    // Logic: Check if First Time User
+    const hasOnboarded = localStorage.getItem('ubc_social_onboarded');
     
+    if (hasOnboarded === 'true') {
+        showDashboard();
+    } else {
+        showOnboarding();
+    }
+
+    setupEventHandlers();
+
     setTimeout(() => {
         document.getElementById('ubc-clubs-tray').classList.add('tray-open');
     }, 50);
 }
 
-/**
- * Renders the input form so the user can tell the AI who they are.
- */
-function renderOnboardingForm() {
-    const container = document.getElementById('ubc-clubs-list');
-    
-    container.innerHTML = `
-        <div style="padding: 15px; background: #f5f5f5; border-radius: 8px;">
-            <h3 style="margin-top:0;">Find Your Community</h3>
-            <p style="font-size:0.9em; color:#666;">Tell us a bit about yourself to get AI recommendations.</p>
-            
-            <div style="margin-bottom: 10px;">
-                <label style="display:block; font-weight:bold;">Year:</label>
-                <select id="ai-year" style="width:100%; padding: 8px;">
-                    <option value="1st Year">1st Year</option>
-                    <option value="2nd Year">2nd Year</option>
-                    <option value="3rd Year">3rd Year</option>
-                    <option value="4th Year+">4th Year+</option>
-                    <option value="Grad Student">Grad Student</option>
-                </select>
-            </div>
+function setupEventHandlers() {
+    // 1. Onboarding Submit
+    document.getElementById('ai-submit-btn').addEventListener('click', handleOnboardingSubmit);
 
-            <div style="margin-bottom: 10px;">
-                <label style="display:block; font-weight:bold;">Classes:</label>
-                <input type="text" id="ai-classes" placeholder="COSC 101, MATH 200" style="width:100%; padding: 8px;">
-            </div>
+    // 2. Redo Onboarding Button (in Clubs tab)
+    document.getElementById('redo-onboarding-btn').addEventListener('click', () => {
+        localStorage.removeItem('ubc_social_onboarded');
+        showOnboarding();
+    });
 
-            <div style="margin-bottom: 15px;">
-                <label style="display:block; font-weight:bold;">Interests:</label>
-                <textarea id="ai-interests" rows="3" placeholder="I like hiking, chess, and coding..." style="width:100%; padding: 8px;"></textarea>
-            </div>
+    // 3. Tab Navigation
+    const tabs = document.querySelectorAll('.nav-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // UI Toggle
+            document.querySelectorAll('.nav-tab').forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottom = 'none';
+                t.style.background = 'none';
+            });
+            tab.classList.add('active');
+            tab.style.borderBottom = '2px solid #0374B5';
+            tab.style.background = 'white';
 
-            <button id="ai-submit-btn" style="width:100%; background:#0374B5; color:white; padding:10px; border:none; border-radius:4px; cursor:pointer;">
-                ✨ Find My Spaces
-            </button>
-        </div>
-        <div id="ai-results-area" style="margin-top: 20px;"></div>
-    `;
-
-    // Attach listener to the new button
-    document.getElementById('ai-submit-btn').addEventListener('click', fetchRecommendations);
+            // Content Toggle
+            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById(tab.dataset.target).style.display = 'block';
+        });
+    });
 }
 
-/**
- * Gathers input, calls Python API, and renders results.
- */
-async function fetchRecommendations() {
-    const resultsArea = document.getElementById('ai-results-area');
-    const btn = document.getElementById('ai-submit-btn');
-    
-    // Visual Loading State
-    btn.innerText = "Thinking...";
-    btn.disabled = true;
-    resultsArea.innerHTML = '<p style="text-align:center; color:#666;">🤖 AI is analyzing campus spaces...</p>';
+// --- VIEW SWITCHING LOGIC ---
 
-    // 1. Gather Data
+function showOnboarding() {
+    document.getElementById('view-onboarding').style.display = 'block';
+    document.getElementById('view-dashboard').style.display = 'none';
+}
+
+function showDashboard() {
+    document.getElementById('view-onboarding').style.display = 'none';
+    document.getElementById('view-dashboard').style.display = 'flex';
+    
+    // Load Data for Dashboard
+    loadSchoolFeed();
+    loadAllClubs();
+    loadGroups();
+}
+
+// --- ONBOARDING LOGIC ---
+
+async function handleOnboardingSubmit() {
+    const btn = document.getElementById('ai-submit-btn');
+    btn.innerText = "Thinking...";
+    
+    // 1. Get Data
     const year = document.getElementById('ai-year').value;
-    const classesRaw = document.getElementById('ai-classes').value;
+    const classes = document.getElementById('ai-classes').value.split(',');
     const interests = document.getElementById('ai-interests').value;
 
-    const payload = {
-        year: year,
-        classes: classesRaw.split(',').map(s => s.trim()), // Convert "A, B" -> ["A", "B"]
-        interests: interests
-    };
-
+    // 2. Call AI
     try {
-        // 2. Send POST Request to Python Backend
-        const response = await fetch(API_ENDPOINT, {
+        const res = await fetch(API_RECOMMEND, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({year, classes, interests})
+        });
+        const data = await res.json();
+        
+        // 3. Render Results below form
+        renderAIResults(data);
+        
+        // 4. Change Button to "Enter Dashboard"
+        btn.innerText = "Go to Dashboard ->";
+        btn.onclick = () => {
+            localStorage.setItem('ubc_social_onboarded', 'true');
+            showDashboard();
+        };
+
+    } catch (e) {
+        console.error(e);
+        alert("Backend error. Ensure Python is running.");
+    }
+}
+
+function renderAIResults(items) {
+    const area = document.getElementById('ai-results-area');
+    area.innerHTML = '<h4>✨ Recommended for You</h4>';
+    items.forEach(item => {
+        area.innerHTML += createCardHTML(item, true);
+    });
+}
+
+// --- DASHBOARD DATA LOADERS ---
+
+async function loadAllClubs() {
+    const container = document.getElementById('all-clubs-list');
+    container.innerHTML = '<p>Loading directory...</p>';
+    
+    try {
+        const res = await fetch(API_ALL_ITEMS);
+        const items = await res.json();
+        
+        container.innerHTML = '';
+        
+        // Render all
+        items.forEach(item => {
+            container.innerHTML += createCardHTML(item);
         });
 
-        if (!response.ok) {
-            throw new Error(`Server Error: ${response.status}`);
-        }
+        // Simple Search Logic
+        document.getElementById('club-search').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const cards = container.querySelectorAll('.dashboard-card');
+            cards.forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(term) ? 'block' : 'none';
+            });
+        });
 
-        const data = await response.json();
+    } catch (e) {
+        container.innerHTML = '<p style="color:red">Failed to load directory.</p>';
+    }
+}
 
-        // 3. Render Results
-        resultsArea.innerHTML = ''; // Clear loading message
-        btn.innerText = "✨ Find My Spaces";
-        btn.disabled = false;
-
-        if (data.length === 0) {
-            resultsArea.innerHTML = '<p>No matches found. Try adding more details about your hobbies!</p>';
-            return;
-        }
-
-        data.forEach(item => {
-            // Determine Color Tag based on Category
-            let tagColor = "#eee";
-            if (item.category === "Club") tagColor = "#d1e7dd"; // Greenish
-            if (item.category === "Event") tagColor = "#f8d7da"; // Reddish
-            if (item.category === "Tech") tagColor = "#cff4fc"; // Blueish
-
-            // Logic for Contact Button
-            let contactBtn = '';
-            if (item.contact) {
-                if (item.contact.includes('http')) {
-                    contactBtn = `<a href="${item.contact.split('|')[0].trim()}" target="_blank" style="display:inline-block; margin-top:5px; color:#0374B5; text-decoration:none; font-weight:bold;">🔗 Visit Page</a>`;
-                } else {
-                    contactBtn = `<span style="display:block; margin-top:5px; font-size:0.85em; color:#555;">📧 ${item.contact}</span>`;
-                }
-            }
-
-            const card = document.createElement('div');
-            card.className = 'club-card';
-            // Use inline styles to avoid needing external CSS updates
-            card.style.border = "1px solid #ddd";
-            card.style.marginBottom = "15px";
-            card.style.padding = "15px";
-            card.style.borderRadius = "8px";
-            card.style.backgroundColor = "white";
-            card.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)";
-
-            card.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:start;">
-                    <h4 style="margin:0 0 5px 0; color:#2D3B45;">${item.name}</h4>
-                    <span style="background:${tagColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${item.category}</span>
-                </div>
-                
-                <p style="font-size:0.9em; color:#444; margin: 5px 0;">${item.description}</p>
-                
-                ${contactBtn}
-                
-                <div style="margin-top:8px; font-size:0.8em; color:green; font-weight:bold;">
-                    Match Score: ${Math.round(item.match_score * 100)}%
+function loadSchoolFeed() {
+    // Mock Data for School Feed
+    const feed = document.getElementById('feed-posts');
+    feed.innerHTML = `
+        <div class="dashboard-card">
+            <strong>🎓 UBC Student Union</strong>
+            <p>Free coffee in the library today starting at 10 AM!</p>
+            <small style="color:grey">1 hour ago</small>
+        </div>
+        <div class="dashboard-card">
+            <strong>🚧 Campus Security</strong>
+            <p>North parking lot is closed for maintenance.</p>
+            <small style="color:grey">Yesterday</small>
+        </div>
+    `;
+    
+    // Populate Events from Backend (reusing item loader for category='Event')
+    // For hackathon speed, we'll just fetch all items and filter for events
+    fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
+        const eventContainer = document.getElementById('feed-events');
+        const events = items.filter(i => i.category === 'Event').slice(0, 3);
+        eventContainer.innerHTML = '';
+        events.forEach(ev => {
+            eventContainer.innerHTML += `
+                <div class="dashboard-card" style="border-left: 3px solid #f8d7da;">
+                    <strong>${ev.name}</strong><br>
+                    <small>${ev.description.substring(0, 60)}...</small>
                 </div>
             `;
-            resultsArea.appendChild(card);
         });
+    });
+}
 
-    } catch (err) {
-        console.error(err);
-        resultsArea.innerHTML = `
-            <div style="color:red; background:#fff0f0; padding:10px; border-radius:5px;">
-                <strong>Connection Error:</strong> Could not reach AI server.<br>
-                <small>Make sure <code>python recommendation_service.py</code> is running!</small>
-            </div>
-        `;
-        btn.innerText = "✨ Find My Spaces";
-        btn.disabled = false;
+function loadGroups() {
+    // Mock "Joined" Groups
+    const joined = JSON.parse(localStorage.getItem('ubc_my_groups') || '[]');
+    const container = document.getElementById('my-joined-chats');
+    
+    if (joined.length > 0) {
+        container.innerHTML = '';
+        joined.forEach(g => {
+            container.innerHTML += `
+                <div class="dashboard-card" style="display:flex; justify-content:space-between;">
+                    <span>💬 ${g}</span>
+                    <button style="background:green; color:white; border:none; border-radius:50%;">✓</button>
+                </div>`;
+        });
     }
+
+    // Load Available Groups from Backend (Category = Group)
+    fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
+        const groupContainer = document.getElementById('available-group-chats');
+        const groups = items.filter(i => i.category === 'Group');
+        groupContainer.innerHTML = '';
+        groups.forEach(g => {
+            // Add Join Logic Button
+            groupContainer.innerHTML += `
+                <div class="dashboard-card">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong>${g.name}</strong>
+                        <button onclick="joinGroup('${g.name}')" style="cursor:pointer;">+ Join</button>
+                    </div>
+                    <p style="font-size:0.8em;">${g.description}</p>
+                </div>
+            `;
+        });
+    });
+}
+
+// Global function for the onclick handler above
+window.joinGroup = function(groupName) {
+    let joined = JSON.parse(localStorage.getItem('ubc_my_groups') || '[]');
+    if (!joined.includes(groupName)) {
+        joined.push(groupName);
+        localStorage.setItem('ubc_my_groups', JSON.stringify(joined));
+        alert(`Joined ${groupName}!`);
+        loadGroups(); // Refresh UI
+    } else {
+        alert("You are already in this group.");
+    }
+};
+
+// Helper: Generate HTML for a Item Card
+function createCardHTML(item, showScore=false) {
+    let tagColor = "#eee";
+    if (item.category === "Club") tagColor = "#d1e7dd";
+    if (item.category === "Event") tagColor = "#f8d7da";
+    if (item.category === "Tech") tagColor = "#cff4fc";
+
+    let contactLink = "";
+    if (item.contact && item.contact.includes('http')) {
+        contactLink = `<a href="${item.contact.split('|')[0].trim()}" target="_blank" style="font-size:0.8em;">🔗 Link</a>`;
+    }
+
+    return `
+        <div class="dashboard-card">
+            <div style="display:flex; justify-content:space-between;">
+                <h4 style="margin:0;">${item.name}</h4>
+                <span style="background:${tagColor}; padding:2px 8px; border-radius:10px; font-size:0.7em;">${item.category}</span>
+            </div>
+            <p style="font-size:0.85em; color:#444; margin:5px 0;">${item.description}</p>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                ${contactLink}
+                ${showScore ? `<span style="color:green; font-weight:bold; font-size:0.8em;">${Math.round(item.match_score*100)}% Match</span>` : ''}
+            </div>
+        </div>
+    `;
 }
