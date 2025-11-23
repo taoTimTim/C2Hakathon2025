@@ -621,75 +621,72 @@ function loadSchoolFeed() {
 }
 
 function loadGroups() {
-    safeFetch(API_ALL_ITEMS).then(items => {
-        const groupContainer = document.getElementById('available-group-chats');
-        groupContainer.classList.add('grid-container'); 
-        const groups = items.filter(i => i.category === 'Group');
-        groupContainer.innerHTML = '';
-        groups.forEach(g => {
-            groupContainer.innerHTML += createCardHTML(g);
-        });
+    safeFetch(API_ALL_ITEMS).then(async (items) => {
+        try {
+            const groupContainer = document.getElementById('available-group-chats');
+            groupContainer.classList.add('grid-container'); 
+            const groups = items.filter(i => i.category === 'Group');
+            groupContainer.innerHTML = '';
+            groups.forEach(g => {
+                groupContainer.innerHTML += createCardHTML(g);
+            });
 
-        if (!roomsResponse.ok) {
-            throw new Error(`HTTP error! status: ${roomsResponse.status}`);
-        }
+            // Fetch rooms for the user
+            const rooms = await safeFetch(`${API_BASE}/rooms`, {
+                headers: {
+                    'Authorization': `Bearer ${SESSION_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log("Rooms loaded:", rooms);
 
-        const rooms = await roomsResponse.json();
-        console.log("Rooms loaded:", rooms);
+            // Filter for project and personal rooms (groups)
+            const groupRooms = rooms.filter(r => r.room_type === 'project' || r.room_type === 'personal');
 
-        // Filter for project and personal rooms (groups)
-        const groupRooms = rooms.filter(r => r.room_type === 'project' || r.room_type === 'personal');
-
-        // Display joined groups
-        const joinedContainer = document.getElementById('my-joined-chats');
-        if (joinedContainer) {
-            if (groupRooms.length === 0) {
-                joinedContainer.innerHTML = '<p style="color:grey; font-style:italic;">You haven\'t joined any groups yet.</p>';
-            } else {
-                joinedContainer.innerHTML = '';
-                groupRooms.forEach(group => {
-                    joinedContainer.innerHTML += createGroupCard(group, true);
-                });
+            // Display joined groups
+            const joinedContainer = document.getElementById('my-joined-chats');
+            if (joinedContainer) {
+                if (groupRooms.length === 0) {
+                    joinedContainer.innerHTML = '<p style="color:grey; font-style:italic;">You haven\'t joined any groups yet.</p>';
+                } else {
+                    joinedContainer.innerHTML = '';
+                    groupRooms.forEach(group => {
+                        joinedContainer.innerHTML += createGroupCard(group, true);
+                    });
+                }
             }
-        }
 
-        // Load all available groups
-        const groupsResponse = await fetch(`${API_BASE}/groups`, {
-            headers: {
-                'Authorization': `Bearer ${SESSION_TOKEN}`,
-                'Content-Type': 'application/json'
+            // Load all available groups
+            const allGroups = await safeFetch(`${API_BASE}/groups`, {
+                headers: {
+                    'Authorization': `Bearer ${SESSION_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            console.log("All groups loaded:", allGroups);
+
+            // Filter out groups the user is already in
+            const joinedIds = new Set(groupRooms.map(g => g.id));
+            const availableGroups = allGroups.filter(g => !joinedIds.has(g.id));
+
+            // Display available groups
+            const availableContainer = document.getElementById('available-group-chats');
+            if (availableContainer) {
+                availableContainer.classList.add('grid-container');
+
+                if (availableGroups.length === 0) {
+                    availableContainer.innerHTML = '<p class="no-data">No available groups</p>';
+                } else {
+                    availableContainer.innerHTML = '';
+                    availableGroups.forEach(group => {
+                        availableContainer.innerHTML += createGroupCard(group, false);
+                    });
+                }
             }
-        });
-
-        if (!groupsResponse.ok) {
-            throw new Error(`HTTP error! status: ${groupsResponse.status}`);
+        } catch (error) {
+            console.error("Error loading groups:", error);
         }
-
-        const allGroups = await groupsResponse.json();
-        console.log("All groups loaded:", allGroups);
-
-        // Filter out groups the user is already in
-        const joinedIds = new Set(groupRooms.map(g => g.id));
-        const availableGroups = allGroups.filter(g => !joinedIds.has(g.id));
-
-        // Display available groups
-        const availableContainer = document.getElementById('available-group-chats');
-        if (availableContainer) {
-            availableContainer.classList.add('grid-container');
-
-            if (availableGroups.length === 0) {
-                availableContainer.innerHTML = '<p class="no-data">No available groups</p>';
-            } else {
-                availableContainer.innerHTML = '';
-                availableGroups.forEach(group => {
-                    availableContainer.innerHTML += createGroupCard(group, false);
-                });
-            }
-        }
-
-    } catch (error) {
-        console.error("Error loading groups:", error);
-    }
+    });
 }
 
 function createGroupCard(group, isJoined) {
