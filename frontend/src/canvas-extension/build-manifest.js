@@ -16,6 +16,9 @@ const chromeManifest = {
   "name": "UBC Canvas Connect",
   "version": "1.1",
   "description": "Adds a Connect button to the global navigation and fetches recommendations.",
+  "icons": {
+    "48": "developer_board_48.png"
+  },
   "permissions": [
     "storage",
     "scripting",
@@ -51,6 +54,9 @@ const firefoxManifest = {
   "name": "UBC Canvas Connect",
   "version": "1.1",
   "description": "Adds a Connect button to the global navigation and fetches recommendations.",
+  "icons": {
+    "48": "developer_board_48.png"
+  },
   "permissions": [
     "storage",
     "https://canvas.ubc.ca/*",
