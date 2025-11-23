@@ -7,6 +7,23 @@ const API_ALL_ITEMS = 'http://127.0.0.1:5000/items';
 
 console.log("UBC Social Spaces: Script Loading...");
 
+async function testBackendConnection() {
+    try {
+        const response = await fetch('http://localhost:5000/api/classes?user_id=832034', {
+            headers: {
+                'Authorization': 'Bearer qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU',
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        console.log("Classes loaded:", data);
+    } catch (error) {
+        console.error("Backend error:", error);
+    }
+}
+
+testBackendConnection();
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startObserver);
 } else {
