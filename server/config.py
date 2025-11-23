@@ -29,6 +29,9 @@ class Config:
     SYNC_INTERVAL = int(os.getenv('SYNC_INTERVAL', 3600))  # 1 hour in seconds
     AUTO_SYNC_ENABLED = os.getenv('AUTO_SYNC_ENABLED', 'true').lower() == 'true'
 
+    # FastAPI Backend Configuration
+    FASTAPI_URL = os.getenv('FASTAPI_URL', 'http://localhost:8000')
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

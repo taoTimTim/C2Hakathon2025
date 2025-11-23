@@ -33,7 +33,7 @@ class AuthService:
             cursor.execute("""
                 INSERT INTO session_tokens (user_id, token_hash, expires_at, created_at)
                 VALUES (%s, %s, %s, %s)
-            """, (user_id, token_hash, expires_at, datetime.utcnow()))
+            """, (str(user_id), token_hash, expires_at, datetime.utcnow()))
 
             conn.commit()
             return token

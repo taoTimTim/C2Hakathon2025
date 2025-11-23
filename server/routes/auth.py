@@ -30,19 +30,29 @@ def login():
         user_service = UserService()
         user = user_service.create_or_update_user(user_info)
 
-        # Generate session token
+        # Generate session token using canvas_user_id
         auth_service = AuthService()
-        session_token = auth_service.generate_session_token(user['id'])
+        session_token = auth_service.generate_session_token(user['canvas_user_id'])
 
         # Sync Canvas groups to rooms (in background if possible)
-        canvas_api.sync_user_groups(user['id'])
+        try:
+            canvas_api.sync_user_groups(user['canvas_user_id'])
+        except Exception as sync_error:
+            print(f"Warning: Group sync failed: {sync_error}")
+            # Continue even if sync fails
 
         return jsonify({
             "session_token": session_token,
             "user": user
         }), 200
 
+    except KeyError as e:
+        print(f"KeyError in login: {str(e)}")
+        return jsonify({"error": f"Missing required field: {str(e)}"}), 500
     except Exception as e:
+        print(f"Login error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/logout', methods=['POST'])
