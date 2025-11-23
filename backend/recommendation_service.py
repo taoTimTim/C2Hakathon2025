@@ -78,9 +78,17 @@ def load_and_train_model():
     tfidf_vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf_vectorizer.fit_transform(all_data_df['soup'])
     
-    print(f"🤖 Model trained on {len(all_data_df)} total spaces.")
+    print(f"Model trained on {len(all_data_df)} total spaces.")
 
-@app.route('/recommend', methods=['POST'])
+@app.route('/items', methods=['GET'])
+def get_all_items():
+    """Returns the full list of clubs/events/groups for the directory."""
+    try:
+        # Convert DataFrame to list of dicts
+        items = all_data_df.to_dict(orient='records')
+        return jsonify(items)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 def recommend():
     data = request.json
     
