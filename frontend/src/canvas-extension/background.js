@@ -4,18 +4,40 @@ console.log('Background script starting...');
 // Use browser API for Firefox compatibility (Chrome also supports it)
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
-// Keep service worker alive (Chrome MV3 only - prevents termination)
+// Keep service worker alive using persistent connections
+let keepAliveConnections = new Set();
+
+// Handle persistent connections from content scripts (keeps service worker alive)
+browserAPI.runtime.onConnect.addListener((port) => {
+    if (port.name === 'keepAlive') {
+        keepAliveConnections.add(port);
+        console.log('Keep-alive connection established. Active connections:', keepAliveConnections.size);
+        
+        port.onDisconnect.addListener(() => {
+            keepAliveConnections.delete(port);
+            console.log('Keep-alive connection closed. Active connections:', keepAliveConnections.size);
+        });
+        
+        // Handle ping messages
+        port.onMessage.addListener((msg) => {
+            if (msg.action === 'ping') {
+                // Connection is alive, do nothing
+            }
+        });
+    }
+});
+
+// Also use alarms as backup (Chrome MV3 only)
 if (browserAPI.alarms) {
-    // Set up a periodic alarm to keep service worker alive
     browserAPI.alarms.onAlarm.addListener((alarm) => {
         if (alarm.name === 'keepAlive') {
-            console.log('Service worker keep-alive ping');
+            console.log('Service worker keep-alive ping via alarm');
         }
     });
     
-    // Create alarm that fires every 4 minutes (service workers can be terminated after 5 minutes of inactivity)
-    browserAPI.alarms.create('keepAlive', { periodInMinutes: 4 });
-    console.log('Keep-alive alarm set');
+    // More frequent alarm as backup (every 2 minutes)
+    browserAPI.alarms.create('keepAlive', { periodInMinutes: 2 });
+    console.log('Keep-alive alarm set (backup)');
 }
 
 // Handle installation/update

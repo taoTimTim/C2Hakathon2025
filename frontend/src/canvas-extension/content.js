@@ -1,6 +1,43 @@
 // Browser API compatibility (works for both Chrome and Firefox)
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
+// Keep background service worker alive with persistent connection
+let keepAliveConnection = null;
+
+function maintainBackgroundConnection() {
+    try {
+        // Create persistent connection to keep service worker alive
+        keepAliveConnection = browserAPI.runtime.connect({ name: 'keepAlive' });
+        
+        keepAliveConnection.onDisconnect.addListener(() => {
+            // Reconnect if connection is lost
+            console.log('Background connection lost, reconnecting...');
+            setTimeout(maintainBackgroundConnection, 1000);
+        });
+        
+        // Send periodic pings to keep connection alive
+        const pingInterval = setInterval(() => {
+            if (keepAliveConnection) {
+                try {
+                    keepAliveConnection.postMessage({ action: 'ping' });
+                } catch (e) {
+                    clearInterval(pingInterval);
+                    maintainBackgroundConnection();
+                }
+            }
+        }, 20000); // Ping every 20 seconds
+        
+        console.log('Background connection established');
+    } catch (error) {
+        console.error('Failed to establish background connection:', error);
+        // Retry after a delay
+        setTimeout(maintainBackgroundConnection, 2000);
+    }
+}
+
+// Establish connection when content script loads
+maintainBackgroundConnection();
+
 async function safeFetch(url, options = {}) {
     return new Promise((resolve, reject) => {
         // Ensure background script is ready
