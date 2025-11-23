@@ -11,39 +11,43 @@ console.log("UBC Social Spaces: Extension Loaded.");
 initExtension();
 
 function initExtension() {
-    // Find the Canvas Global Navigation Menu
+    // 1. Find the Global Navigation Menu
     const globalNav = document.getElementById('menu');
     if (!globalNav) return;
 
-    // Prevent duplicate injection
+    // 2. Prevent duplicate injection
     if (document.getElementById('ubc-clubs-nav-item')) return;
 
-    // Create the Menu Item
+    // 3. Create the List Item (li) and Link (a)
     const navItem = document.createElement('li');
     navItem.id = 'ubc-clubs-nav-item';
     navItem.className = 'ic-app-header__menu-list-item'; 
 
-    // Use a "Users" or "Groups" icon style
+    // Create the inner HTML (Using YOUR specific SVG and "Connect" text)
     navItem.innerHTML = `
         <a id="global_nav_clubs_link" href="#" class="ic-app-header__menu-list-link">
             <div class="menu-item-icon-container" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3">
+                    <path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h560q33 0 56.5 23.5T800-760v80h80v80h-80v80h80v80h-80v80h80v80h-80v80q0 33-23.5 56.5T720-120H160Zm0-80h560v-560H160v560Zm80-80h200v-160H240v160Zm240-280h160v-120H480v120Zm-240 80h200v-200H240v200Zm240 200h160v-240H480v240ZM160-760v560-560Z"/>
                 </svg>
             </div>
-            <div class="menu-item__text">Social</div>
+            <div class="menu-item__text">Connect</div>
         </a>
     `;
 
+    // 4. Add Click Event
     navItem.addEventListener('click', (e) => {
         e.preventDefault();
         toggleTray();
     });
 
-    globalNav.appendChild(navItem);
+    // 5. Append to the menu (Using YOUR specific insertBefore logic)
+    // Note: using childNodes[6] might be fragile if Canvas changes layout, but keeping as requested.
+    if (globalNav.childNodes.length > 6) {
+        globalNav.insertBefore(navItem, globalNav.childNodes[6]);
+    } else {
+        globalNav.appendChild(navItem); // Fallback
+    }
 }
 
 async function toggleTray() {
@@ -55,7 +59,6 @@ async function toggleTray() {
     }
 
     // --- STEP 1: Load the Tray HTML ---
-    // NOTE: Ensure 'canvas_connect.html' exists in your extension folder!
     const url = chrome.runtime.getURL('canvas_connect.html');
     const response = await fetch(url);
     const html = await response.text();
@@ -70,7 +73,8 @@ async function toggleTray() {
         document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
     });
 
-    // --- STEP 2: Render the Input Form (Instead of fetching immediately) ---
+    // --- STEP 2: Render the Input Form ---
+    // We do NOT fetch data immediately. We wait for user input.
     renderOnboardingForm();
     
     setTimeout(() => {
@@ -131,7 +135,7 @@ async function fetchRecommendations() {
     // Visual Loading State
     btn.innerText = "Thinking...";
     btn.disabled = true;
-    resultsArea.innerHTML = '<p style="text-align:center; color:#666;">🤖 AI is analyzing 60+ campus spaces...</p>';
+    resultsArea.innerHTML = '<p style="text-align:center; color:#666;">🤖 AI is analyzing campus spaces...</p>';
 
     // 1. Gather Data
     const year = document.getElementById('ai-year').value;
@@ -180,7 +184,6 @@ async function fetchRecommendations() {
             // Logic for Contact Button
             let contactBtn = '';
             if (item.contact) {
-                // Check if it's a link or an email
                 if (item.contact.includes('http')) {
                     contactBtn = `<a href="${item.contact.split('|')[0].trim()}" target="_blank" style="display:inline-block; margin-top:5px; color:#0374B5; text-decoration:none; font-weight:bold;">🔗 Visit Page</a>`;
                 } else {
@@ -190,7 +193,7 @@ async function fetchRecommendations() {
 
             const card = document.createElement('div');
             card.className = 'club-card';
-            // Inline styles to ensure it looks good immediately
+            // Use inline styles to avoid needing external CSS updates
             card.style.border = "1px solid #ddd";
             card.style.marginBottom = "15px";
             card.style.padding = "15px";
