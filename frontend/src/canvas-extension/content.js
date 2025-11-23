@@ -424,7 +424,7 @@ async function handleOnboardingSubmit() {
             body: JSON.stringify({ year, classes, interests })
         });
         renderAIResults(data);
-        btn.innerText = "Enter Social Space ->";
+        btn.innerText = "Enter Social Space";
         btn.onclick = () => {
             localStorage.setItem('ubc_social_onboarded', 'true');
             showDashboard();
