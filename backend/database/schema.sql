@@ -80,9 +80,11 @@ CREATE TABLE IF NOT EXISTS posts (
     FOREIGN KEY (author) REFERENCES users(canvas_user_id)
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
-    session_id VARCHAR(255) PRIMARY KEY,
-    canvas_user_id VARCHAR(255) NOT NULL,
+CREATE TABLE IF NOT EXISTS session_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (canvas_user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(canvas_user_id) ON DELETE CASCADE
 );
