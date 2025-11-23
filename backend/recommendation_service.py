@@ -122,4 +122,4 @@ def recommend():
 if __name__ == '__main__':
     load_and_train_model()
     # Host on 0.0.0.0 to ensure it listens on all interfaces
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    app.run(debug=True, port=5001, host='0.0.0.0')
