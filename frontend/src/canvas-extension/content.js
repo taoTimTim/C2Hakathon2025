@@ -222,18 +222,47 @@ async function toggleTray() {
         trayContainer.innerHTML = html;
         document.body.appendChild(trayContainer);
 
-        document.getElementById('ubc-tray-close').addEventListener('click', () => {
-            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-            setMenuIconActive(false);
-        });
-
-        if (localStorage.getItem('ubc_social_onboarded') === 'true') {
-            showDashboard();
+        // Check if user is logged in
+        const sessionToken = localStorage.getItem('ubc_session_token');
+        if (!sessionToken) {
+            // Show login view only
+            const loginView = document.getElementById('view-login');
+            const mainContent = document.getElementById('main-content');
+            if (loginView) loginView.style.display = 'block';
+            if (mainContent) mainContent.style.display = 'none';
+            setupLoginHandler();
         } else {
-            showOnboarding();
-        }
+            // User is logged in, show main content
+            const loginView = document.getElementById('view-login');
+            const mainContent = document.getElementById('main-content');
+            
+            if (loginView) loginView.style.display = 'none';
+            if (mainContent) mainContent.style.display = 'block';
+            
+            // Close Handler
+            const closeBtn = document.getElementById('ubc-tray-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+                    menutab.classList.toggle('ic-app-header__menu-list-item--active');
+                });
+            }
+            
+            // Logout Handler
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', handleLogout);
+            }
 
-        setupEventHandlers();
+            // VIEW LOGIC
+            if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+                showDashboard();
+            } else {
+                showOnboarding();
+            }
+
+            setupEventHandlers();
+        }
 
         setTimeout(() => {
             document.getElementById('ubc-clubs-tray').classList.add('tray-open');
@@ -242,6 +271,98 @@ async function toggleTray() {
 
     } catch (err) {
         console.error("ERROR:", err);
+    }
+}
+
+function setupLoginHandler() {
+    const loginBtn = document.getElementById('login-submit-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleLogin);
+    }
+    
+    const tokenInput = document.getElementById('login-token');
+    if (tokenInput) {
+        tokenInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+    }
+}
+
+function handleLogout() {
+    // Clear session token
+    localStorage.removeItem('ubc_session_token');
+    
+    // Hide main content, show login
+    const loginView = document.getElementById('view-login');
+    const mainContent = document.getElementById('main-content');
+    if (loginView) loginView.style.display = 'block';
+    if (mainContent) mainContent.style.display = 'none';
+    
+    // Clear the token input field
+    const tokenInput = document.getElementById('login-token');
+    if (tokenInput) tokenInput.value = '';
+    
+    // Setup login handler again
+    setupLoginHandler();
+}
+
+async function handleLogin() {
+    const tokenInput = document.getElementById('login-token');
+    const loginBtn = document.getElementById('login-submit-btn');
+    const errorDiv = document.getElementById('login-error');
+    
+    const canvasToken = tokenInput.value.trim();
+    
+    if (!canvasToken) {
+        errorDiv.textContent = 'Please enter your Canvas API token';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    loginBtn.innerText = 'Logging in...';
+    loginBtn.disabled = true;
+    errorDiv.style.display = 'none';
+    
+    try {
+        const response = await safeFetch('http://127.0.0.1:5000/api/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ canvas_token: canvasToken })
+        });
+        
+        if (!response.session_token) {
+            throw new Error('Invalid response from server');
+        }
+        
+        // Store session token
+        localStorage.setItem('ubc_session_token', response.session_token);
+        
+        // Hide login, show main content
+        document.getElementById('view-login').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        
+        // Setup close handler
+        document.getElementById('ubc-tray-close').addEventListener('click', () => {
+            document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
+            document.getElementById('ubc-clubs-nav-item').classList.toggle('ic-app-header__menu-list-item--active');
+        });
+        
+        // Show onboarding or dashboard
+        if (localStorage.getItem('ubc_social_onboarded') === 'true') {
+            showDashboard();
+        } else {
+            showOnboarding();
+        }
+        
+        setupEventHandlers();
+        
+    } catch (e) {
+        errorDiv.textContent = e.message || 'Login failed. Please check your token.';
+        errorDiv.style.display = 'block';
+        loginBtn.innerText = 'Login';
+        loginBtn.disabled = false;
     }
 }
 

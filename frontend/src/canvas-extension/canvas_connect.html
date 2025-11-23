@@ -1,10 +1,32 @@
 <div id="ubc-clubs-tray">
     
-    <!-- Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; border-bottom: 1px solid #eee; background: white;">
-        <h2 style="margin:0; font-size: 1.4rem; color: #2D3B45;">Social Spaces</h2>
-        <button id="ubc-tray-close" style="background:none; border:none; font-size: 1.8rem; cursor:pointer; color: #888;">&times;</button>
+    <!-- VIEW 0: Login (Shown First) -->
+    <div id="view-login" style="display: block; padding: 40px 30px;">
+        <h2 style="margin:0 0 10px 0; font-size: 1.6rem; color: #2D3B45; text-align: center;">Welcome to Social Spaces</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">Enter your Canvas API token to get started</p>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display:block; font-weight:bold; margin-bottom: 8px;">Canvas API Token:</label>
+            <input type="password" id="login-token" placeholder="Enter your Canvas API token" style="width:100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family:inherit;">
+        </div>
+
+        <button id="login-submit-btn" style="width:100%; background:#0374B5; color:white; padding:12px; border:none; border-radius:6px; cursor:pointer; font-weight: bold; font-size: 1rem;">
+            Login
+        </button>
+        
+        <div id="login-error" style="margin-top: 15px; color: red; text-align: center; display: none;"></div>
     </div>
+
+    <!-- Main Content (Hidden until logged in) -->
+    <div id="main-content" style="display: none;">
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; border-bottom: 1px solid #eee; background: white;">
+            <h2 style="margin:0; font-size: 1.4rem; color: #2D3B45;">Social Spaces</h2>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="logout-btn" style="background:none; border:none; color: #666; cursor:pointer; font-size: 0.9rem; padding: 5px 10px;">Logout</button>
+                <button id="ubc-tray-close" style="background:none; border:none; font-size: 1.8rem; cursor:pointer; color: #888;">&times;</button>
+            </div>
+        </div>
 
     <!-- VIEW 1: Onboarding (Sidebar Style) -->
     <div id="view-onboarding" style="display: block;">
@@ -97,5 +119,6 @@
             </div>
 
         </div>
+    </div>
     </div>
 </div>
