@@ -1,3 +1,17 @@
+async function safeFetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+            { action: "fetch", url, options },
+            (response) => {
+                if (!response) return reject("No response received");
+                if (response.error) return reject(response.error);
+                resolve(response.data);
+            }
+        );
+    });
+}
+
+
 // ===========================================================
 // ROBUST VERSION - Left Tray & Full Screen Dashboard
 // ===========================================================
@@ -199,8 +213,9 @@ async function toggleTray() {
 
     try {
         const url = chrome.runtime.getURL('canvas_connect.html');
-        const response = await fetch(url);
-        const html = await response.text();
+        const html = await chrome.runtime.getURL('canvas_connect.html')
+        ? await (await fetch(url)).text() 
+        : ""; 
 
         const trayContainer = document.createElement('div');
         trayContainer.id = 'ubc-clubs-tray-container';
@@ -286,12 +301,12 @@ async function handleOnboardingSubmit() {
     const interests = document.getElementById('ai-interests').value;
 
     try {
-        const res = await fetch(API_RECOMMEND, {
+        const data = await safeFetch(API_RECOMMEND, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({year, classes, interests})
+            body: JSON.stringify({ year, classes, interests })
         });
-        const data = await res.json();
+        
         renderAIResults(data);
         
         btn.innerText = "Enter Social Space ->";
@@ -384,8 +399,8 @@ async function loadAllClubs() {
     if(!container) return;
     container.classList.add('grid-container'); 
     
-    const res = await fetch(API_ALL_ITEMS);
-    const items = await res.json();
+    const items = await safeFetch(API_ALL_ITEMS);
+
     container.innerHTML = '';
     items.forEach(item => {
         container.innerHTML += createCardHTML(item);
@@ -393,7 +408,8 @@ async function loadAllClubs() {
 }
 
 function loadSchoolFeed() {
-    fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
+    // Note: School feed usually isn't a grid, keep it linear or grid as preferred
+    safeFetch(API_ALL_ITEMS).then(items => {
         const eventContainer = document.getElementById('feed-events');
         eventContainer.classList.add('grid-container'); 
         const events = items.filter(i => i.category === 'Event');
@@ -405,7 +421,7 @@ function loadSchoolFeed() {
 }
 
 function loadGroups() {
-    fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
+    safeFetch(API_ALL_ITEMS).then(items => {
         const groupContainer = document.getElementById('available-group-chats');
         groupContainer.classList.add('grid-container'); 
         const groups = items.filter(i => i.category === 'Group');
