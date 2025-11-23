@@ -494,7 +494,7 @@ async function handleOnboardingSubmit() {
             body: JSON.stringify({ year, classes, interests })
         });
         renderAIResults(data);
-        btn.innerText = "Enter Social Space ->";
+        btn.innerText = "Enter Social Space";
         btn.onclick = () => {
             localStorage.setItem('ubc_social_onboarded', 'true');
             showDashboard();
@@ -652,6 +652,25 @@ function loadGroups() {
         } catch (error) {
             console.error("Error loading groups:", error);
         }
+        const groupContainer = document.getElementById('available-group-chats');
+        groupContainer.classList.add('grid-container'); 
+        const groups = items.filter(i => i.category === 'Group');
+        groupContainer.innerHTML = '';
+        groups.forEach(g => {
+            groupContainer.innerHTML += createGroupCard(g, false);
+        });
+        
+        // Attach event listeners to join buttons after HTML is inserted
+        groupContainer.querySelectorAll('[data-join-group-id]').forEach(button => {
+            const groupId = parseInt(button.getAttribute('data-join-group-id'));
+            button.addEventListener('click', () => {
+                if (window.joinGroup) {
+                    window.joinGroup(groupId);
+                } else {
+                    console.error('joinGroup function not defined');
+                }
+            });
+        });
     });
 }
 
@@ -667,10 +686,9 @@ function createGroupCard(group, isJoined) {
                 <h4 style="margin:0 0 10px 0;">${group.name}</h4>
                 <span style="background:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${badgeText}</span>
             </div>
-            <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555;">
+            <p style="font-size:0.9em; color:#555; margin:0 0 10px 0;">
                 ${group.description || 'No description'}
             </p>
-            <span onclick="document.getElementById('${uniqueId}').classList.toggle('desc-full')" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline;">Read description</span>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
                     ? `<button class="btn-open-group-chat" data-group-id="${group.id}" data-group-name="${escapedName}" data-room-type="${group.room_type}" style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`

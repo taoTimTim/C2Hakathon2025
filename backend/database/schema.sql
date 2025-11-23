@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS posts (
     FOREIGN KEY (author) REFERENCES users(canvas_user_id)
 );
 
+CREATE TABLE IF NOT EXISTS clubs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(255),
+    contact VARCHAR(255),
+    image_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS session_tokens (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
