@@ -404,16 +404,106 @@ function loadSchoolFeed() {
     });
 }
 
-function loadGroups() {
-    fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
-        const groupContainer = document.getElementById('available-group-chats');
-        groupContainer.classList.add('grid-container'); 
-        const groups = items.filter(i => i.category === 'Group');
-        groupContainer.innerHTML = '';
-        groups.forEach(g => {
-            groupContainer.innerHTML += createCardHTML(g);
+async function loadGroups() {
+    try {
+        // Load user's joined rooms
+        const roomsResponse = await fetch(`${API_BASE}/rooms`, {
+            headers: {
+                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
         });
-    });
+
+        if (!roomsResponse.ok) {
+            throw new Error(`HTTP error! status: ${roomsResponse.status}`);
+        }
+
+        const rooms = await roomsResponse.json();
+        console.log("Rooms loaded:", rooms);
+
+        // Filter for project and personal rooms (groups)
+        const groupRooms = rooms.filter(r => r.room_type === 'project' || r.room_type === 'personal');
+
+        // Display joined groups
+        const joinedContainer = document.getElementById('my-joined-chats');
+        if (joinedContainer) {
+            if (groupRooms.length === 0) {
+                joinedContainer.innerHTML = '<p style="color:grey; font-style:italic;">You haven\'t joined any groups yet.</p>';
+            } else {
+                joinedContainer.innerHTML = '';
+                groupRooms.forEach(group => {
+                    joinedContainer.innerHTML += createGroupCard(group, true);
+                });
+            }
+        }
+
+        // Load all available groups
+        const groupsResponse = await fetch(`${API_BASE}/groups`, {
+            headers: {
+                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!groupsResponse.ok) {
+            throw new Error(`HTTP error! status: ${groupsResponse.status}`);
+        }
+
+        const allGroups = await groupsResponse.json();
+        console.log("All groups loaded:", allGroups);
+
+        // Filter out groups the user is already in
+        const joinedIds = new Set(groupRooms.map(g => g.id));
+        const availableGroups = allGroups.filter(g => !joinedIds.has(g.id));
+
+        // Display available groups
+        const availableContainer = document.getElementById('available-group-chats');
+        if (availableContainer) {
+            availableContainer.classList.add('grid-container');
+
+            if (availableGroups.length === 0) {
+                availableContainer.innerHTML = '<p class="no-data">No available groups</p>';
+            } else {
+                availableContainer.innerHTML = '';
+                availableGroups.forEach(group => {
+                    availableContainer.innerHTML += createGroupCard(group, false);
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error("Error loading groups:", error);
+    }
+}
+
+function createGroupCard(group, isJoined) {
+    const badgeColor = group.room_type === 'personal' ? '#cff4fc' : '#fff3cd';
+    const badgeText = group.room_type === 'personal' ? 'PERSONAL' : 'PROJECT';
+
+    return `
+        <div class="dashboard-card group-card" data-group-id="${group.id}">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <h4 style="margin:0 0 10px 0;">${group.name}</h4>
+                <span style="background:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${badgeText}</span>
+            </div>
+            <p style="font-size:0.9em; color:#555;">${group.description || 'No description'}</p>
+            ${group.max_members ? `<p style="font-size:0.85em; color:#777;">Max members: ${group.max_members}</p>` : ''}
+            <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
+                ${isJoined
+                    ? `<button onclick="openGroupChat(${group.id})" style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
+                    : `<button onclick="joinGroup(${group.id})" style="padding:5px 10px; background:#0374B5; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
+                }
+            </div>
+        </div>
+    `;
+}
+
+window.openGroupChat = function(groupId) {
+    console.log(`Opening chat for group ${groupId}`);
+}
+
+window.joinGroup = function(groupId) {
+    console.log(`Joining group ${groupId}`);
 }
 
 function createCardHTML(item, showScore=false) {
