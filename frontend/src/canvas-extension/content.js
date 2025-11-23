@@ -2,8 +2,21 @@
 // ROBUST VERSION - Left Tray & Full Screen Dashboard
 // ===========================================================
 
-const API_RECOMMEND = 'http://127.0.0.1:5000/recommend';
-const API_ALL_ITEMS = 'http://127.0.0.1:5000/items';
+const API_RECOMMEND = 'http://127.0.0.1:5001/recommend';
+const API_ALL_ITEMS = 'http://127.0.0.1:5001/items';
+
+// COLORS
+const COLOR_ACTIVE_BG = '#FFFFFF';      // White background when open
+const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // Exact UBC Blue RGB
+const COLOR_INACTIVE_ICON = '#FFFFFF';  // White icon when closed
+const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; // Ensures tooltip text stays white
+
+// STATE TRACKER (To restore the previous menu state)
+let previousState = {
+    element: null,
+    hadClass: false,
+    ariaCurrent: null
+};
 
 console.log("UBC Social Spaces: Script Loading...");
 
@@ -14,7 +27,6 @@ if (document.readyState === 'loading') {
 }
 
 function startObserver() {
-    // Canvas menu ID is 'menu'
     const menu = document.getElementById('menu');
     if (menu) {
         initExtension(menu);
@@ -38,15 +50,20 @@ function initExtension(globalNav) {
     const navItem = document.createElement('li');
     navItem.id = 'ubc-clubs-nav-item';
     navItem.className = 'ic-app-header__menu-list-item'; 
+    
+    navItem.style.position = 'relative';
+    navItem.style.width = '100%'; 
+    navItem.style.margin = '0'; 
+    navItem.style.boxSizing = 'border-box';
 
     navItem.innerHTML = `
-        <a id="global_nav_clubs_link" href="#" class="ic-app-header__menu-list-link">
-            <div class="menu-item-icon-container" aria-hidden="true">
-                <svg class="ic-icon-svg ic-icon-svg--dashboard" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3">
+        <a id="global_nav_clubs_link" href="#" class="ic-app-header__menu-list-link" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; background: transparent !important; border: none !important;">
+            <div class="menu-item-icon-container" aria-hidden="true" style="position: relative; z-index: 20; display: flex; align-items: center; justify-content: center; background: transparent !important; border: none !important; margin: 0 !important;">
+                <svg class="ic-icon-svg ic-icon-svg--dashboard" xmlns="http://www.w3.org/2000/svg" height="26px" viewBox="0 -960 960 960" width="26px" fill="${COLOR_INACTIVE_ICON}" style="display: block; margin: 0 auto;">
                     <path d="M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h560q33 0 56.5 23.5T800-760v80h80v80h-80v80h80v80h-80v80h80v80h-80v80q0 33-23.5 56.5T720-120H160Zm0-80h560v-560H160v560Zm80-80h200v-160H240v160Zm240-280h160v-120H480v120Zm-240 80h200v-200H240v200Zm240 200h160v-240H480v240ZM160-760v560-560Z"/>
                 </svg>
             </div>
-            <div class="menu-item__text">Connect</div>
+            <div class="menu-item__text" style="position: relative; z-index: 20; color: ${COLOR_TEXT_ALWAYS_WHITE} !important;">Connect</div>
         </a>
     `;
 
@@ -55,22 +72,137 @@ function initExtension(globalNav) {
         toggleTray();
     });
 
-    // --- POSITIONING FIX ---
     const targetIndex = 3; 
     if (globalNav.children.length > targetIndex) {
         globalNav.insertBefore(navItem, globalNav.children[targetIndex]);
     } else {
         globalNav.appendChild(navItem);
     }
+
+    // --- SMART NAVIGATION GUARD ---
+    globalNav.addEventListener('click', (e) => {
+        // 1. Ignore clicks on our own button (handled above)
+        if (navItem.contains(e.target)) return;
+
+        // 2. Find the clicked link
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        // 3. CHECK: Is this link pointing to the current page?
+        // If yes, we BLOCK the reload and just close our tray.
+        // If no, we let the reload happen.
+        if (link.pathname === window.location.pathname) {
+            e.preventDefault(); // Stop the refresh
+            e.stopPropagation();
+            
+            // Close tray and Restore previous active icon
+            setMenuIconActive(false);
+            
+            // Explicitly close tray logic in case helper didn't catch it
+            const tray = document.getElementById('ubc-clubs-tray');
+            if(tray) tray.classList.remove('tray-open');
+            
+        } else {
+            // It's a real navigation (e.g. Dashboard -> Calendar)
+            // We want to wipe the state so when we return, we don't accidentally highlight the wrong thing.
+            handleExternalNavClick();
+        }
+    }, true); 
+}
+
+// --- HANDLER FOR REAL NAVIGATIONS ---
+function handleExternalNavClick() {
+    const tray = document.getElementById('ubc-clubs-tray');
+    if (tray) {
+        tray.classList.remove('tray-open');
+    }
+    
+    const navItem = document.getElementById('ubc-clubs-nav-item');
+    if(navItem) {
+        const iconSvg = navItem.querySelector('svg');
+        const text = navItem.querySelector('.menu-item__text');
+        
+        navItem.style.backgroundColor = ''; 
+        if(iconSvg) {
+            iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
+            iconSvg.style.fill = COLOR_INACTIVE_ICON;
+        }
+        if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
+    }
+
+    // NUCLEAR OPTION: User is leaving the page, so forget everything.
+    previousState = { element: null, hadClass: false, ariaCurrent: null };
+}
+
+// --- ACTIVE STATE CONTROLLER ---
+function setMenuIconActive(isActive) {
+    const navItem = document.getElementById('ubc-clubs-nav-item');
+    if (!navItem) return;
+
+    const iconSvg = navItem.querySelector('svg');
+    const text = navItem.querySelector('.menu-item__text'); 
+
+    if (isActive) {
+        // 1. STYLE OUR BUTTON (Active)
+        navItem.style.backgroundColor = COLOR_ACTIVE_BG; 
+        if(iconSvg) {
+            iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON); 
+            iconSvg.style.fill = COLOR_ACTIVE_ICON; 
+        }
+        if(text) text.style.setProperty('color', COLOR_ACTIVE_ICON, 'important');
+
+        // 2. DEACTIVATE OTHERS
+        const menuItems = document.querySelectorAll('.ic-app-header__menu-list-item');
+        menuItems.forEach(item => {
+            if (item === navItem) return; 
+
+            if (item.classList.contains('ic-app-header__menu-list-item--active')) {
+                previousState.element = item;
+                previousState.hadClass = true;
+                previousState.ariaCurrent = null; 
+                item.classList.remove('ic-app-header__menu-list-item--active');
+            }
+
+            const link = item.querySelector('a');
+            if (link && link.getAttribute('aria-current') === 'page') {
+                if (!previousState.element || previousState.element === item) {
+                    previousState.element = item;
+                    previousState.ariaCurrent = 'page';
+                }
+                link.removeAttribute('aria-current');
+            }
+        });
+
+    } else {
+        // 1. STYLE OUR BUTTON (Inactive)
+        navItem.style.backgroundColor = ''; 
+        if(iconSvg) {
+            iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
+            iconSvg.style.fill = COLOR_INACTIVE_ICON;
+        }
+        if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
+
+        // 2. RESTORE PREVIOUS STATE
+        if (previousState.element) {
+            if (previousState.hadClass) {
+                previousState.element.classList.add('ic-app-header__menu-list-item--active');
+            }
+            if (previousState.ariaCurrent) {
+                const link = previousState.element.querySelector('a');
+                if (link) link.setAttribute('aria-current', 'page');
+            }
+            previousState = { element: null, hadClass: false, ariaCurrent: null };
+        }
+    }
 }
 
 async function toggleTray() {
     let tray = document.getElementById('ubc-clubs-tray');
-    let menutab = document.getElementById('ubc-clubs-nav-item');
     
     if (tray) {
         tray.classList.toggle('tray-open');
-        menutab.classList.toggle('ic-app-header__menu-list-item--active');
+        const isOpen = tray.classList.contains('tray-open');
+        setMenuIconActive(isOpen);
         return;
     }
 
@@ -84,13 +216,11 @@ async function toggleTray() {
         trayContainer.innerHTML = html;
         document.body.appendChild(trayContainer);
 
-        // Close Handler
         document.getElementById('ubc-tray-close').addEventListener('click', () => {
             document.getElementById('ubc-clubs-tray').classList.remove('tray-open');
-            menutab.classList.toggle('ic-app-header__menu-list-item--active');
+            setMenuIconActive(false);
         });
 
-        // VIEW LOGIC
         if (localStorage.getItem('ubc_social_onboarded') === 'true') {
             showDashboard();
         } else {
@@ -99,13 +229,13 @@ async function toggleTray() {
 
         setupEventHandlers();
 
-        // Animate In
         setTimeout(() => {
             document.getElementById('ubc-clubs-tray').classList.add('tray-open');
+            setMenuIconActive(true);
         }, 50);
 
     } catch (err) {
-        console.error("❌ ERROR:", err);
+        console.error("ERROR:", err);
     }
 }
 
@@ -134,11 +264,9 @@ function setupEventHandlers() {
     });
 }
 
-// --- VIEW CONTROLLERS ---
-
 function showOnboarding() {
     const tray = document.getElementById('ubc-clubs-tray');
-    tray.classList.remove('tray-full-width'); // Narrow width
+    tray.classList.remove('tray-full-width'); 
     
     document.getElementById('view-onboarding').style.display = 'block';
     document.getElementById('view-dashboard').style.display = 'none';
@@ -146,7 +274,7 @@ function showOnboarding() {
 
 function showDashboard() {
     const tray = document.getElementById('ubc-clubs-tray');
-    tray.classList.add('tray-full-width'); // EXPAND TO FULL WIDTH
+    tray.classList.add('tray-full-width'); 
     
     document.getElementById('view-onboarding').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'flex';
@@ -155,8 +283,6 @@ function showDashboard() {
     loadAllClubs();
     loadGroups();
 }
-
-// --- DATA LOADERS & AI ---
 
 async function handleOnboardingSubmit() {
     const btn = document.getElementById('ai-submit-btn');
@@ -189,18 +315,16 @@ async function handleOnboardingSubmit() {
 
 function renderAIResults(items) {
     const area = document.getElementById('ai-results-area');
-    area.innerHTML = '<h4>✨ Recommended for You</h4>';
+    area.innerHTML = '<h4>Recommended for You</h4>';
     items.forEach(item => {
         area.innerHTML += createCardHTML(item, true);
     });
 }
 
-// --- LOADERS WITH GRID SUPPORT ---
-
 async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
     if(!container) return;
-    container.classList.add('grid-container'); // Add Grid Class
+    container.classList.add('grid-container'); 
     
     const res = await fetch(API_ALL_ITEMS);
     const items = await res.json();
@@ -211,10 +335,9 @@ async function loadAllClubs() {
 }
 
 function loadSchoolFeed() {
-    // Note: School feed usually isn't a grid, keep it linear or grid as preferred
     fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
         const eventContainer = document.getElementById('feed-events');
-        eventContainer.classList.add('grid-container'); // Add Grid Class
+        eventContainer.classList.add('grid-container'); 
         const events = items.filter(i => i.category === 'Event');
         eventContainer.innerHTML = '';
         events.forEach(ev => {
@@ -226,7 +349,7 @@ function loadSchoolFeed() {
 function loadGroups() {
     fetch(API_ALL_ITEMS).then(res => res.json()).then(items => {
         const groupContainer = document.getElementById('available-group-chats');
-        groupContainer.classList.add('grid-container'); // Add Grid Class
+        groupContainer.classList.add('grid-container'); 
         const groups = items.filter(i => i.category === 'Group');
         groupContainer.innerHTML = '';
         groups.forEach(g => {
@@ -236,7 +359,6 @@ function loadGroups() {
 }
 
 function createCardHTML(item, showScore=false) {
-    // Simplified card for grid view
     let tagColor = "#eee";
     if (item.category === "Club") tagColor = "#d1e7dd";
     if (item.category === "Event") tagColor = "#f8d7da";
