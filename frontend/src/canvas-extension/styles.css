@@ -13,7 +13,7 @@
     background: white;
     box-shadow: 2px 0 10px rgba(0,0,0,0.2);
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-    z-index: 999; /* Below Canvas Modal but above content */
+    z-index: 50; /* Below Canvas Modal but above content */
     display: flex;
     flex-direction: column;
     font-family: "LatoWeb", "Lato", sans-serif;
