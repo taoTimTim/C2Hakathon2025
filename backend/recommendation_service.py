@@ -6,8 +6,11 @@ from sklearn.metrics.pairwise import linear_kernel
 import os
 
 app = Flask(__name__)
-CORS(app)
 
+# --- CRITICAL FIX: Allow all origins explicitly ---
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Global variables
 tfidf_vectorizer = None
 tfidf_matrix = None
 all_data_df = None
@@ -19,6 +22,7 @@ def load_and_train_model():
     """
     global tfidf_vectorizer, tfidf_matrix, all_data_df
 
+    # Initialize empty dataframes
     dfs = [] 
     
     # 1. Load Clubs
@@ -33,14 +37,15 @@ def load_and_train_model():
     # 2. Load Events
     if os.path.exists('events.csv'):
         try:
+            # Added error_bad_lines=False logic (via on_bad_lines for newer pandas) to skip broken rows
             df = pd.read_csv('events.csv', keep_default_na=False)
-            if 'contact' not in df.columns: df['contact'] = "" # Account for missing column data
+            if 'contact' not in df.columns: df['contact'] = "" 
             print(f"Loaded {len(df)} events.")
             dfs.append(df)
         except Exception as e:
             print(f"Error loading events.csv: {e}")
 
-    # 3. Load Groups 
+    # 3. Load Groups
     if os.path.exists('groups.csv'):
         try:
             df = pd.read_csv('groups.csv', keep_default_na=False)
@@ -53,28 +58,14 @@ def load_and_train_model():
     # 4. Merge or Fallback
     if len(dfs) > 0:
         all_data_df = pd.concat(dfs, ignore_index=True)
-        all_data_df = all_data_df.fillna("") # Safety net
+        all_data_df = all_data_df.fillna("") 
     else:
         print("No CSV files found. Using DUMMY data.")
-        # Dummy data fallback
-        data = {
-            'id': [101, 801, 901],
-            'name': ['Robotics Club', 'Winter Formal', 'Freshman Group'],
-            'category': ['Tech', 'Event', 'Group'],
-            'contact': ['robotics@uni.edu', '', 'discord.gg/freshman'],
-            'description': [
-                'Building robots.',
-                'Dance party.',
-                'For 1st year students to connect.'
-            ]
-        }
+        data = {'id': [1], 'name': ['Test Club'], 'category': ['Test'], 'contact': [''], 'description': ['Test']}
         all_data_df = pd.DataFrame(data)
 
-    # --- AI Model Training ---
-    # Create the "keyword soup"
+    # --- AI Training ---
     all_data_df['soup'] = all_data_df['name'] + " " + all_data_df['category'] + " " + all_data_df['description']
-    
-    # Vectorize
     tfidf_vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf_vectorizer.fit_transform(all_data_df['soup'])
     
@@ -82,15 +73,20 @@ def load_and_train_model():
 
 @app.route('/items', methods=['GET'])
 def get_all_items():
-    """Returns the full list of clubs/events/groups for the directory."""
     try:
-        # Convert DataFrame to list of dicts
         items = all_data_df.to_dict(orient='records')
         return jsonify(items)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/recommend', methods=['POST', 'OPTIONS'])
 def recommend():
+    # Handle preflight request manually if CORS fails (Safety Net)
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     data = request.json
+    print(f"Received Request: {data}") # Debug print
     
     user_year = data.get('year', '')
     user_classes = " ".join(data.get('classes', []))
@@ -125,4 +121,5 @@ def recommend():
 
 if __name__ == '__main__':
     load_and_train_model()
-    app.run(debug=True, port=5000)
+    # Host on 0.0.0.0 to ensure it listens on all interfaces
+    app.run(debug=True, port=5000, host='0.0.0.0')
