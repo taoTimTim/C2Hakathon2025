@@ -1,9 +1,13 @@
 // Chat UI Component
 // Creates and manages the chat interface
+// Note: API_BASE is defined in content.js
 
-const API_BASE = 'http://localhost:5000/api';
-const SESSION_TOKEN = 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
-const SOCKET_URL = 'http://localhost:5000';
+const CHAT_SOCKET_URL = 'http://localhost:5000';
+
+// Get session token from localStorage
+function getSessionToken() {
+    return localStorage.getItem('ubc_session_token') || 'qRrl-skZBpTUo3QSsb0QOexTda6HWVozH3AgfFQ7rfU';
+}
 
 let chatClient = null;
 let currentChatRoom = null;
@@ -12,7 +16,7 @@ let typingTimeout = null;
 // Initialize chat client
 async function initializeChatClient() {
     if (!chatClient) {
-        chatClient = new ChatClient(SOCKET_URL, SESSION_TOKEN);
+        chatClient = new ChatClient(CHAT_SOCKET_URL, getSessionToken());
 
         try {
             await chatClient.connect();
@@ -140,7 +144,7 @@ async function loadMessageHistory(roomId) {
     try {
         const response = await fetch(`${API_BASE}/messages?room_id=${roomId}`, {
             headers: {
-                'Authorization': `Bearer ${SESSION_TOKEN}`,
+                'Authorization': `Bearer ${getSessionToken()}`,
                 'Content-Type': 'application/json'
             }
         });

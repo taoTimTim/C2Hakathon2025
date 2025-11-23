@@ -82,6 +82,33 @@ const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; // Exact UBC Blue RGB
 const COLOR_INACTIVE_ICON = '#FFFFFF';  // White icon when closed
 const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; // Ensures tooltip text stays white
 
+// Global functions for onclick handlers (must be defined early)
+window.openClassChat = function(classId, className, roomType) {
+    console.log(`Opening chat for class ${classId}`);
+    if (typeof openChat === 'function') {
+        openChat(classId, className, roomType);
+    } else {
+        console.error('openChat function not available yet');
+    }
+};
+
+window.viewClassDetails = function(classId) {
+    console.log(`Viewing details for class ${classId}`);
+};
+
+window.openGroupChat = function(groupId, groupName, roomType) {
+    console.log(`Opening chat for group ${groupId}`);
+    if (typeof openChat === 'function') {
+        openChat(groupId, groupName, roomType);
+    } else {
+        console.error('openChat function not available yet');
+    }
+};
+
+window.joinGroup = function(groupId) {
+    console.log(`Joining group ${groupId}`);
+};
+
 // STATE TRACKER (To restore the previous menu state)
 let previousState = {
     element: null,
@@ -668,20 +695,6 @@ function createClassCard(classItem) {
     `;
 }
 
-// Global functions required for inline onclick events
-window.openClassChat = function(classId, className, roomType) {
-    console.log(`Opening chat for class ${classId}`);
-    if (typeof openChat === 'function') {
-        openChat(classId, className, roomType);
-    } else {
-        console.error('openChat function not available');
-    }
-}
-
-window.viewClassDetails = function(classId) {
-    console.log(`Viewing details for class ${classId}`);
-}
-
 async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
     if(!container) return;
@@ -719,10 +732,17 @@ function loadGroups() {
                 groupContainer.innerHTML += createCardHTML(g);
             });
 
+            // Get session token from localStorage
+            const sessionToken = localStorage.getItem('ubc_session_token');
+            if (!sessionToken) {
+                console.warn('No session token found, cannot load groups');
+                return;
+            }
+
             // Fetch rooms for the user
             const rooms = await safeFetch(`${API_BASE}/rooms`, {
                 headers: {
-                    'Authorization': `Bearer ${SESSION_TOKEN}`,
+                    'Authorization': `Bearer ${sessionToken}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -747,7 +767,7 @@ function loadGroups() {
             // Load all available groups
             const allGroups = await safeFetch(`${API_BASE}/groups`, {
                 headers: {
-                    'Authorization': `Bearer ${SESSION_TOKEN}`,
+                    'Authorization': `Bearer ${sessionToken}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -798,19 +818,6 @@ function createGroupCard(group, isJoined) {
             </div>
         </div>
     `;
-}
-
-window.openGroupChat = function(groupId, groupName, roomType) {
-    console.log(`Opening chat for group ${groupId}`);
-    if (typeof openChat === 'function') {
-        openChat(groupId, groupName, roomType);
-    } else {
-        console.error('openChat function not available');
-    }
-}
-
-window.joinGroup = function(groupId) {
-    console.log(`Joining group ${groupId}`);
 }
 
 function createCardHTML(item, showScore=false) {
