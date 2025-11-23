@@ -37,7 +37,6 @@ function initExtension() {
     });
 
     // 5. Append to the menu
-    // globalNav.appendChild(navItem);
     globalNav.insertBefore(navItem, globalNav.childNodes[6]);
 }
 
