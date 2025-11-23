@@ -86,7 +86,8 @@
 /* Read More Logic */
 .desc-preview {
     display: -webkit-box;
-    -webkit-line-clamp: 3; 
+    -webkit-line-clamp: 3;
+    line-clamp: 3; /* Standard property for modern browsers */
     -webkit-box-orient: vertical;
     overflow: hidden;
     margin-bottom: 5px;
@@ -94,6 +95,7 @@
 
 .desc-full {
     -webkit-line-clamp: unset !important;
+    line-clamp: unset !important; /* Standard property for modern browsers */
     overflow: visible !important;
     display: block !important;
 }

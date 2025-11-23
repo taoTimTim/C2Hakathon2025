@@ -85,6 +85,24 @@ def get_groups():
     response, status_code = proxy.forward_request('/groups', method='GET', query_params={'user_id': user_id})
     return jsonify(response), status_code
 
+@bp.route('/groups/<int:group_id>/join', methods=['POST'])
+def join_group(group_id):
+    """Proxy to FastAPI: Join a group"""
+    user_id = get_authenticated_user()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    # Forward request body with user_id
+    json_data = request.get_json() or {}
+    json_data['user_id'] = user_id
+    
+    response, status_code = proxy.forward_request(
+        f'/groups/{group_id}/join',
+        method='POST',
+        json_data=json_data
+    )
+    return jsonify(response), status_code
+
 @bp.route('/clubs', methods=['GET'])
 def get_clubs():
     """Proxy to FastAPI: Get all clubs"""

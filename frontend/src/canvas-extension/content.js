@@ -424,7 +424,7 @@ async function handleOnboardingSubmit() {
             body: JSON.stringify({ year, classes, interests })
         });
         renderAIResults(data);
-        btn.innerText = "Enter Social Space ->";
+        btn.innerText = "Enter Social Space";
         btn.onclick = () => {
             localStorage.setItem('ubc_social_onboarded', 'true');
             showDashboard();
@@ -516,13 +516,24 @@ function loadGroups() {
         groups.forEach(g => {
             groupContainer.innerHTML += createGroupCard(g, false);
         });
+        
+        // Attach event listeners to join buttons after HTML is inserted
+        groupContainer.querySelectorAll('[data-join-group-id]').forEach(button => {
+            const groupId = parseInt(button.getAttribute('data-join-group-id'));
+            button.addEventListener('click', () => {
+                if (window.joinGroup) {
+                    window.joinGroup(groupId);
+                } else {
+                    console.error('joinGroup function not defined');
+                }
+            });
+        });
     });
 }
 
 function createGroupCard(group, isJoined) {
     const badgeColor = '#fff3cd'; 
     const badgeText = 'GROUP';
-    const uniqueId = `desc-group-${group.id || Math.random().toString(36).substr(2, 9)}`;
 
     return `
         <div class="dashboard-card group-card" data-group-id="${group.id}">
@@ -530,14 +541,13 @@ function createGroupCard(group, isJoined) {
                 <h4 style="margin:0 0 10px 0;">${group.name}</h4>
                 <span style="background:${badgeColor}; padding:2px 8px; border-radius:12px; font-size:0.7em;">${badgeText}</span>
             </div>
-            <p id="${uniqueId}" class="desc-preview" style="font-size:0.9em; color:#555;">
+            <p style="font-size:0.9em; color:#555; margin:0 0 10px 0;">
                 ${group.description || 'No description'}
             </p>
-            <span onclick="document.getElementById('${uniqueId}').classList.toggle('desc-full')" class="read-more-link" style="color:#0055B7; font-size:0.8em; cursor:pointer; text-decoration:underline;">Read description</span>
             <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
                 ${isJoined
                     ? `<button style="padding:5px 10px; background:#2D3B45; color:white; border:none; border-radius:4px; cursor:pointer;">Open Chat</button>`
-                    : `<button onclick="joinGroup(${group.id})" style="padding:5px 10px; background:#0055B7; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
+                    : `<button data-join-group-id="${group.id}" class="join-group-btn" style="padding:5px 10px; background:#0055B7; color:white; border:none; border-radius:4px; cursor:pointer;">Join Group</button>`
                 }
             </div>
         </div>
@@ -572,6 +582,124 @@ function createCardHTML(item, showScore=false) {
 
 // --- MISSING HELPERS ADDED BACK ---
 window.openGroupChat = function(groupId) { console.log(`Opening chat for group ${groupId}`); alert(`Opening chat for group ${groupId}`); };
-window.joinGroup = function(id) { alert(`Joining group ${id}`); };
+
+// Define joinGroup function on window object early
+window.joinGroup = async function(groupId) {
+    const sessionToken = localStorage.getItem('ubc_session_token');
+    if (!sessionToken) {
+        showNotification('Please log in first', 'error');
+        return;
+    }
+    
+    // Get group name for notification (from the DOM) - get it before we make the API call
+    const groupCard = document.querySelector(`[data-group-id="${groupId}"]`);
+    let groupName = 'group';
+    if (groupCard) {
+        const nameEl = groupCard.querySelector('h4');
+        if (nameEl) groupName = nameEl.textContent;
+    }
+    
+    try {
+        // The backend will extract user_id from the Authorization header automatically
+        const url = `${API_BASE}/groups/${groupId}/join`;
+        console.log('Joining group:', groupId, 'URL:', url);
+        
+        const response = await safeFetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({}) // Backend will add user_id from the auth token
+        });
+        
+        console.log('Join group response:', response);
+        
+        // Show success notification
+        const name = response.group_name || groupName;
+        showNotification(`You joined the group ${name}`, 'success');
+        
+        // Reload groups to update UI
+        loadGroups();
+    } catch (e) {
+        console.error("Error joining group:", e);
+        console.error("Error details:", {
+            message: e.message,
+            stack: e.stack,
+            name: e.name
+        });
+        showNotification(`Failed to join group: ${e.message || 'Please try again.'}`, 'error');
+    }
+};
+
+// Helper to get current user_id from session token
+async function getCurrentUserId() {
+    const sessionToken = localStorage.getItem('ubc_session_token');
+    if (!sessionToken) return null;
+    
+    try {
+        const response = await safeFetch(`${API_BASE}/auth/verify`, {
+            headers: { 'Authorization': `Bearer ${sessionToken}` }
+        });
+        return response.user_id || response.canvas_user_id;
+    } catch (e) {
+        console.error("Error getting user ID:", e);
+        return null;
+    }
+}
+
+// Show notification at bottom of screen
+function showNotification(message, type = 'success') {
+    // Remove existing notification if any
+    const existing = document.getElementById('ubc-notification');
+    if (existing) existing.remove();
+    
+    const notification = document.createElement('div');
+    notification.id = 'ubc-notification';
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'success' ? '#0055B7' : '#d32f2f'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-size: 14px;
+        font-weight: 500;
+        animation: slideUp 0.3s ease-out;
+    `;
+    notification.textContent = message;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+    `;
+    if (!document.getElementById('ubc-notification-styles')) {
+        style.id = 'ubc-notification-styles';
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideUp 0.3s ease-out reverse';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
 window.openClassChat = function(classId) { console.log(`Opening chat ${classId}`); };
 window.viewClassDetails = function(classId) { console.log(`Details ${classId}`); };
