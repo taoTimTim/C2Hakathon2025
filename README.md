@@ -6,21 +6,21 @@ A Chrome/Firefox extension that brings real-time chat, club discovery, and intel
 
 UBC Canvas Connect transforms the Canvas learning management system into a social platform where students can communicate, collaborate, and discover opportunities. The extension seamlessly integrates into Canvas pages, adding a "Connect" button to the global navigation that opens an interface displaying university announcement, clubs, your personal classes, and chat channels to communicate with peers.
 
-The app solves the problem of fragmented communication in online learning environments. Instead of switching between multiple platforms, students can chat with classmates directly within Canvas, discover clubs and events based on their interests and courses, and form study groups—all without leaving their learning environment.
+The app solves the problem of fragmented communication in online learning environments. Instead of switching between multiple platforms, students can chat with classmates directly within Canvas, discover clubs and events based on their interests and courses, and form study groups-all without leaving their learning environment.
 
 What makes it unique is its deep Canvas integration: it automatically syncs courses and groups from Canvas, uses machine learning to recommend relevant clubs and events based on a student's academic profile, and provides real-time chat functionality. The system intelligently matches students with clubs , analyzing their year level, enrolled courses, and stated interests to provide personalized recommendations.
 
 ## Features
 
-**Intelligent Club Recommendations** — Machine learning algorithm analyzes user profile (year level, courses, interests) to recommend relevant clubs and events from a curated database.
+**Intelligent Club Recommendations** - Machine learning algorithm analyzes user profile (year level, courses, interests) to recommend relevant clubs and events from a curated database.
 
-**Automatic Canvas Sync** — Seamlessly syncs Canvas courses and groups as chat rooms, automatically adding enrolled students as members without manual setup.
+**Automatic Canvas Sync** - Seamlessly syncs Canvas courses and groups as chat rooms, automatically adding enrolled students as members without manual setup.
 
-**Club Discovery and Management** — Browse and join student clubs, create new clubs, and manage memberships with role-based permissions (leaders, members).
+**Club Discovery and Management** - Browse and join student clubs, create new clubs, and manage memberships with role-based permissions (leaders, members).
 
-**Personal Study Groups** — Create private study groups for focused collaboration outside of official course structures, and connect with your groups for group projects instead of using external applications.
+**Personal Study Groups** - Create private study groups for focused collaboration outside of official course structures, and connect with your groups for group projects instead of using external applications.
 
-**Announcements and Posts** — Share announcements and posts within classes, clubs, and project groups with support for images and rich content.
+**Announcements and Posts** - Share announcements and posts within classes, clubs, and project groups with support for images and rich content.
 
 ## Tech Stack
 
@@ -166,13 +166,13 @@ The pain point was clear: students were using multiple platforms (Discord, Messa
 
 ## Challenges We Faced
 
-**CORS Configuration** — Getting the extension to communicate with localhost servers required extensive CORS configuration and handling preflight requests across multiple services.
+**CORS Configuration** - Getting the extension to communicate with localhost servers required extensive CORS configuration and handling preflight requests across multiple services.
 
-**Service Worker Persistence** — Chrome Manifest V3 uses service workers that can be terminated, requiring keep-alive mechanisms and careful connection management.
+**Service Worker Persistence** - Chrome Manifest V3 uses service workers that can be terminated, requiring keep-alive mechanisms and careful connection management.
 
-**Canvas API Rate Limiting** — Syncing large numbers of courses and groups required implementing pagination and error handling for rate-limited requests.
+**Canvas API Rate Limiting** - Syncing large numbers of courses and groups required implementing pagination and error handling for rate-limited requests.
 
-**Multi-Browser Compatibility** — Supporting both Chrome (Manifest V3) and Firefox (Manifest V2) required maintaining separate manifest files and browser API compatibility layers.
+**Multi-Browser Compatibility** - Supporting both Chrome (Manifest V3) and Firefox (Manifest V2) required maintaining separate manifest files and browser API compatibility layers.
 
 ## Accomplishments
 
@@ -185,37 +185,37 @@ The pain point was clear: students were using multiple platforms (Discord, Messa
 
 ## What We Learned
 
-**Extension Development** — Deep dive into Chrome Manifest V3 and Firefox Manifest V2 differences, content script injection, background service workers, and browser API compatibility.
+**Extension Development** - Deep dive into Chrome Manifest V3 and Firefox Manifest V2 differences, content script injection, background service workers, and browser API compatibility.
 
-**Machine Learning Integration** — Applying TF-IDF vectorization and cosine similarity for content-based recommendations, balancing model accuracy with real-time performance.
+**Machine Learning Integration** - Applying TF-IDF vectorization and cosine similarity for content-based recommendations, balancing model accuracy with real-time performance.
 
-**API Design** — Creating RESTful endpoints with proper authentication, error handling, and CORS configuration for cross-origin requests from browser extensions.
+**API Design** - Creating RESTful endpoints with proper authentication, error handling, and CORS configuration for cross-origin requests from browser extensions.
 
-**Database Design** — Consolidating multiple related tables into a unified schema while maintaining flexibility and referential integrity.
+**Database Design** - Consolidating multiple related tables into a unified schema while maintaining flexibility and referential integrity.
 
-**Multi-Service Coordination** — Orchestrating multiple backend services (Flask, FastAPI, recommendation service) with proper proxy patterns and service communication.
+**Multi-Service Coordination** - Orchestrating multiple backend services (Flask, FastAPI, recommendation service) with proper proxy patterns and service communication.
 
-**Canvas API Integration** — Working with Canvas LMS API, handling pagination, rate limits, and syncing complex data structures like courses, groups, and enrollments.
+**Canvas API Integration** - Working with Canvas LMS API, handling pagination, rate limits, and syncing complex data structures like courses, groups, and enrollments.
 
 ## Future Improvements
 
-**Enhanced Recommendations** — Incorporate collaborative filtering, user interaction history, and more sophisticated ML models to improve recommendation accuracy.
+**Enhanced Recommendations** - Incorporate collaborative filtering, user interaction history, and more sophisticated ML models to improve recommendation accuracy.
 
-**Mobile Support** — Develop mobile apps or a responsive web interface so students can access chat and recommendations on their phones.
+**Mobile Support** - Develop mobile apps or a responsive web interface so students can access chat and recommendations on their phones.
 
-**Notification System** — Implement push notifications for new messages, mentions, and club recommendations even when Canvas is not open.
+**Notification System** - Implement push notifications for new messages, mentions, and club recommendations even when Canvas is not open.
 
-**Rich Media Support** — Add file sharing, image uploads, and embedded content in chat messages and posts.
+**Rich Media Support** - Add file sharing, image uploads, and embedded content in chat messages and posts.
 
-**Advanced Search** — Implement full-text search across messages, posts, and clubs with filtering and sorting options.
+**Advanced Search** - Implement full-text search across messages, posts, and clubs with filtering and sorting options.
 
-**Analytics Dashboard** — Provide insights into club engagement, message activity, and recommendation effectiveness for administrators.
+**Analytics Dashboard** - Provide insights into club engagement, message activity, and recommendation effectiveness for administrators.
 
-**Security Enhancements** — Add end-to-end encryption for private messages, rate limiting on API endpoints, and more robust session management.
+**Security Enhancements** - Add end-to-end encryption for private messages, rate limiting on API endpoints, and more robust session management.
 
-**UI/UX Polish** — Improve the chat interface with better message formatting, emoji support, read receipts, and typing indicators.
+**UI/UX Polish** - Improve the chat interface with better message formatting, emoji support, read receipts, and typing indicators.
 
-**Integration Expansion** — Support for other LMS platforms beyond Canvas, calendar integration for club events, and email notifications.
+**Integration Expansion** - Support for other LMS platforms beyond Canvas, calendar integration for club events, and email notifications.
 
 ## Team
 
