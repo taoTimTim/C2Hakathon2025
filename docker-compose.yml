@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./backend  # Path to where the Dockerfile is
+    container_name: canvas_extension_backend
+    ports:
+      - "8000:8000"   # Maps computer port 8000 to container port 8000
+    volumes:
+      # This mirrors your local code into the container.
+      # Changes you make locally will update the container instantly!
+      - ./backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    # If you have a database later, you would add it here
