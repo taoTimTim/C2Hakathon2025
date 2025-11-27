@@ -7,9 +7,37 @@ services:
     ports:
       - "8000:8000"   # Maps computer port 8000 to container port 8000
     volumes:
-      # This mirrors your local code into the container.
-      # Changes you make locally will update the container instantly!
       - ./backend:/app
     environment:
       - PYTHONUNBUFFERED=1
-    # If you have a database later, you would add it here
+      # We pass the DB connection info here so you don't hardcode it in Python
+      - DB_HOST=db
+      - DB_NAME=canvas_club_db
+      - DB_USER=user
+      - DB_PASSWORD=password
+    depends_on:
+      - db # Wait for the database to start before starting the API
+
+# Service 2: The MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: canvas_extension_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: canvas_club_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306" # Optional: lets you view the DB using a tool like DBeaver
+    volumes:
+      # 1. Persist data: Keeps your chat logs even if you delete the container
+      - mysql_data:/var/lib/mysql
+
+      # 2. THE MAGIC STEP:
+      # This maps your local SQL files into the container's startup folder.
+      # When the container starts for the 1st time, it runs these .sql files automatically!
+      - ./backend/database:/docker-entrypoint-initdb.d
+
+volumes:
+  mysql_data:
