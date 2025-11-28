@@ -15,6 +15,7 @@ services:
       - DB_NAME=canvas_club_db
       - DB_USER=user
       - DB_PASSWORD=password
+      - DB_URL=url
     depends_on:
       - db # Wait for the database to start before starting the API
 

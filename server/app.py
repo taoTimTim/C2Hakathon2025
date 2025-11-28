@@ -11,6 +11,18 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# In main.py
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8000",   # Your local API
+        "http://127.0.0.1:8000",   # Alternative local access
+        "https://canvas.ubc.ca",   # ⬅️ CRITICAL: The site your extension lives on
+        # Add the UBC Canvas dev/staging site if you have one.
+    ],
+    # ... rest of your CORS settings ...
+)
+
 # Configure CORS
 CORS(app, resources={
     r"/api/*": {
