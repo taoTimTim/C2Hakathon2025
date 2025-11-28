@@ -18,6 +18,13 @@ services:
     depends_on:
       - db # Wait for the database to start before starting the API
 
+  rec:
+    container_name: recommendation_service
+    ports:
+      - "5001:5001"
+    build: ./backend
+
+
 # Service 2: The MySQL Database
   db:
     image: mysql:8.0
