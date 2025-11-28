@@ -401,7 +401,6 @@ async function handleLogin() {
 }
 
 function setupEventHandlers() {
-    console.log('event handlers are being set up!');
     const submitBtn = document.getElementById('ai-submit-btn');
     if(submitBtn) submitBtn.addEventListener('click', handleOnboardingSubmit);
 
