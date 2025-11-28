@@ -71,12 +71,6 @@ cd C2Hakathon2025
 
 ### 2. Backend setup
 
-Install Python dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
 Set up environment variables. Create a `.env` file in the root directory:
 
 ```env
@@ -90,36 +84,11 @@ DB_PORT=3306
 # Canvas API Configuration
 CANVAS_API_URL=https://canvas.ubc.ca/api/v1
 CANVAS_BASE_URL=https://canvas.ubc.ca
-
-# Server Configuration
-PORT=5000
-SECRET_KEY=your-secret-key-here
-ALLOWED_ORIGINS=http://localhost:5000,https://canvas.ubc.ca
-
-# Recommendation Service
-RECOMMENDATION_URL=http://localhost:5001
-FLASK_API_URL=http://127.0.0.1:5000
-
-Start the Flask server (main backend):
-
-```bash
-cd server
-python app.py
 ```
 
-In a separate terminal, start the FastAPI backend:
-
-```bash
-cd backend
-uvicorn main:app --reload --port 8000
-```
-
-In another terminal, start the recommendation service:
-
-```bash
-cd backend
-python recommendation_service.py
-```
+Install [Docker Desktop](https://www.docker.com/).
+In a terminal, run `docker-compose up --build`. This will start all of the backends.
+If you make any changes to the database or servers, run `docker-compose down`.
 
 ### 3. Extension setup
 

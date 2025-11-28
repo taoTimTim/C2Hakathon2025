@@ -24,7 +24,7 @@ function maintainBackgroundConnection() {
                     maintainBackgroundConnection();
                 }
             }
-        }, 20000); 
+        }, 20000);
         // console.log('Background connection established');
     } catch (error) {
         console.error('Failed to establish background connection:', error);
@@ -65,10 +65,10 @@ window.safeFetch = safeFetch;
 window.API_BASE = API_BASE;
 
 // --- COLORS ---
-const COLOR_ACTIVE_BG = '#FFFFFF';      
-const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)'; 
-const COLOR_INACTIVE_ICON = '#FFFFFF';  
-const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF'; 
+const COLOR_ACTIVE_BG = '#FFFFFF';
+const COLOR_ACTIVE_ICON = 'rgb(9, 32, 67)';
+const COLOR_INACTIVE_ICON = '#FFFFFF';
+const COLOR_TEXT_ALWAYS_WHITE = '#FFFFFF';
 
 // Global functions for onclick handlers (must be defined early)
 window.openClassChat = function(classId, className, roomType) {
@@ -134,11 +134,11 @@ function initExtension(globalNav) {
 
     const navItem = document.createElement('li');
     navItem.id = 'ubc-clubs-nav-item';
-    navItem.className = 'ic-app-header__menu-list-item'; 
-    
+    navItem.className = 'ic-app-header__menu-list-item';
+
     navItem.style.position = 'relative';
-    navItem.style.width = '100%'; 
-    navItem.style.margin = '0'; 
+    navItem.style.width = '100%';
+    navItem.style.margin = '0';
     navItem.style.boxSizing = 'border-box';
 
     navItem.innerHTML = `
@@ -155,7 +155,7 @@ function initExtension(globalNav) {
         toggleTray();
     });
 
-    const targetIndex = 3; 
+    const targetIndex = 3;
     if (globalNav.children.length > targetIndex) {
         globalNav.insertBefore(navItem, globalNav.children[targetIndex]);
     } else {
@@ -168,7 +168,7 @@ function initExtension(globalNav) {
         if (!link) return;
 
         if (link.pathname === window.location.pathname) {
-            e.preventDefault(); 
+            e.preventDefault();
             e.stopPropagation();
             setMenuIconActive(false);
             const tray = document.getElementById('ubc-clubs-tray');
@@ -180,7 +180,7 @@ function initExtension(globalNav) {
         } else {
             handleExternalNavClick();
         }
-    }, true); 
+    }, true);
 }
 
 function handleExternalNavClick() {
@@ -188,20 +188,20 @@ function handleExternalNavClick() {
     if (tray) {
         tray.classList.remove('tray-open');
     }
-    
+
     const navItem = document.getElementById('ubc-clubs-nav-item');
     if(navItem) {
         const iconSvg = navItem.querySelector('svg');
         const text = navItem.querySelector('.menu-item__text');
-        
-        navItem.style.backgroundColor = ''; 
+
+        navItem.style.backgroundColor = '';
         if(iconSvg) {
-            iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
+            iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON);
             iconSvg.style.fill = COLOR_INACTIVE_ICON;
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
     }
-    
+
     document.title = originalPageTitle;
     previousState = { element: null, hadClass: false, ariaCurrent: null };
 }
@@ -211,23 +211,23 @@ function setMenuIconActive(isActive) {
     if (!navItem) return;
 
     const iconSvg = navItem.querySelector('svg');
-    const text = navItem.querySelector('.menu-item__text'); 
+    const text = navItem.querySelector('.menu-item__text');
 
     if (isActive) {
-        navItem.style.backgroundColor = COLOR_ACTIVE_BG; 
+        navItem.style.backgroundColor = COLOR_ACTIVE_BG;
         if(iconSvg) {
-            iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON); 
-            iconSvg.style.fill = COLOR_ACTIVE_ICON; 
+            iconSvg.setAttribute('fill', COLOR_ACTIVE_ICON);
+            iconSvg.style.fill = COLOR_ACTIVE_ICON;
         }
         if(text) text.style.setProperty('color', COLOR_ACTIVE_ICON, 'important');
 
         const menuItems = document.querySelectorAll('.ic-app-header__menu-list-item');
         menuItems.forEach(item => {
-            if (item === navItem) return; 
+            if (item === navItem) return;
             if (item.classList.contains('ic-app-header__menu-list-item--active')) {
                 previousState.element = item;
                 previousState.hadClass = true;
-                previousState.ariaCurrent = null; 
+                previousState.ariaCurrent = null;
                 item.classList.remove('ic-app-header__menu-list-item--active');
             }
             const link = item.querySelector('a');
@@ -240,9 +240,9 @@ function setMenuIconActive(isActive) {
             }
         });
     } else {
-        navItem.style.backgroundColor = ''; 
+        navItem.style.backgroundColor = '';
         if(iconSvg) {
-            iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON); 
+            iconSvg.setAttribute('fill', COLOR_INACTIVE_ICON);
             iconSvg.style.fill = COLOR_INACTIVE_ICON;
         }
         if(text) text.style.setProperty('color', COLOR_TEXT_ALWAYS_WHITE, 'important');
@@ -262,12 +262,12 @@ function setMenuIconActive(isActive) {
 
 async function toggleTray() {
     let tray = document.getElementById('ubc-clubs-tray');
-    
+
     // Case 1: Tray already exists
     if (tray) {
         const isNowOpen = tray.classList.toggle('tray-open');
         setMenuIconActive(isNowOpen);
-        
+
         // FIX: Force re-check of width every time we open existing tray
         if (isNowOpen) {
             if (localStorage.getItem('ubc_social_onboarded') === 'true') {
@@ -297,6 +297,11 @@ async function toggleTray() {
             document.title = originalPageTitle;
         });
 
+        // Attach UI event handlers immediately so onboarding controls
+        // (like the AI submit button) work even when the login view
+        // is shown or other conditional views are active.
+        setupEventHandlers();
+
         const sessionToken = localStorage.getItem('ubc_session_token');
         if (!sessionToken) {
             const loginView = document.getElementById('view-login');
@@ -310,7 +315,6 @@ async function toggleTray() {
             } else {
                 showOnboarding();
             }
-            setupEventHandlers();
         }
 
         setTimeout(() => {
@@ -357,37 +361,37 @@ async function handleLogin() {
     const loginBtn = document.getElementById('login-submit-btn');
     const errorDiv = document.getElementById('login-error');
     const canvasToken = tokenInput.value.trim();
-    
+
     if (!canvasToken) {
         errorDiv.textContent = 'Please enter your Canvas API token';
         errorDiv.style.display = 'block';
         return;
     }
-    
+
     loginBtn.innerText = 'Logging in...';
     loginBtn.disabled = true;
     errorDiv.style.display = 'none';
-    
+
     try {
         const response = await safeFetch(`${API_BASE}/auth/login`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ canvas_token: canvasToken })
         });
-        
+
         if (!response.session_token) throw new Error('Invalid response');
         localStorage.setItem('ubc_session_token', response.session_token);
-        
+
         document.getElementById('view-login').style.display = 'none';
         if(document.getElementById('main-content')) document.getElementById('main-content').style.display = 'block';
-        
+
         if (localStorage.getItem('ubc_social_onboarded') === 'true') {
             showDashboard();
         } else {
             showOnboarding();
         }
         setupEventHandlers();
-        
+
     } catch (e) {
         errorDiv.textContent = e.message || 'Login failed.';
         errorDiv.style.display = 'block';
@@ -462,14 +466,14 @@ function setupEventHandlers() {
 
 function showOnboarding() {
     const tray = document.getElementById('ubc-clubs-tray');
-    tray.classList.remove('tray-full-width'); 
+    tray.classList.remove('tray-full-width');
     document.getElementById('view-onboarding').style.display = 'block';
     document.getElementById('view-dashboard').style.display = 'none';
 }
 
 function showDashboard() {
     const tray = document.getElementById('ubc-clubs-tray');
-    tray.classList.add('tray-full-width'); 
+    tray.classList.add('tray-full-width');
     document.getElementById('view-onboarding').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'flex';
     loadSchoolFeed();
@@ -515,7 +519,7 @@ function renderAIResults(items) {
 async function loadClasses() {
     try {
         const sessionToken = localStorage.getItem('ubc_session_token');
-        if (!sessionToken) return; 
+        if (!sessionToken) return;
         const classes = await safeFetch(`${API_BASE}/classes`, {
             headers: { 'Authorization': `Bearer ${sessionToken}`, 'Content-Type': 'application/json' }
         });
@@ -555,7 +559,7 @@ function createClassCard(classItem) {
 async function loadAllClubs() {
     const container = document.getElementById('all-clubs-list');
     if(!container) return;
-    container.classList.add('grid-container'); 
+    container.classList.add('grid-container');
     try {
         const items = await safeFetch(API_ALL_ITEMS);
         container.innerHTML = '';
@@ -568,7 +572,7 @@ async function loadAllClubs() {
 function loadSchoolFeed() {
     safeFetch(API_ALL_ITEMS).then(items => {
         const eventContainer = document.getElementById('feed-events');
-        eventContainer.classList.add('grid-container'); 
+        eventContainer.classList.add('grid-container');
         const events = items.filter(i => i.category === 'Event');
         eventContainer.innerHTML = '';
         events.forEach(ev => {
@@ -651,13 +655,13 @@ function loadGroups() {
             console.error("Error loading groups:", error);
         }
         const groupContainer = document.getElementById('available-group-chats');
-        groupContainer.classList.add('grid-container'); 
+        groupContainer.classList.add('grid-container');
         const groups = items.filter(i => i.category === 'Group');
         groupContainer.innerHTML = '';
         groups.forEach(g => {
             groupContainer.innerHTML += createGroupCard(g, false);
         });
-        
+
         // Attach event listeners to join buttons after HTML is inserted
         groupContainer.querySelectorAll('[data-join-group-id]').forEach(button => {
             const groupId = parseInt(button.getAttribute('data-join-group-id'));
